@@ -4,7 +4,8 @@
 //! file upload, and ingestion status polling. All responses are wrapped
 //! in [`ApiResponse`] envelopes.
 
-use axum::extract::{Multipart, Path, Query, State};
+use axum::extract::{Multipart, Path, State};
+use axum_extra::extract::Query;
 use base64::Engine;
 use chrono::Utc;
 use nanoid::nanoid;

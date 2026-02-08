@@ -1,6 +1,7 @@
 //! v1 Memory handlers.
 
-use axum::extract::{Path, Query, State};
+use axum::extract::{Path, State};
+use axum_extra::extract::Query;
 
 use crate::api::v1::dto::{
     ContentForgetRequest, CreateMemoryRequest, ForgetMemoryRequest, ForgetMemoryResponse,
