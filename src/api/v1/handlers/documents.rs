@@ -27,6 +27,7 @@ use crate::processing::ContentExtractor;
     post,
     path = "/api/v1/documents",
     tag = "documents",
+    operation_id = "documents.create",
     request_body = CreateDocumentRequest,
     responses(
         (status = 202, description = "Document accepted for processing", body = CreateDocumentResponse),
@@ -148,6 +149,7 @@ const MAX_FILE_SIZE: usize = 25 * 1024 * 1024; // 25 MB
     post,
     path = "/api/v1/documents:batch",
     tag = "documents",
+    operation_id = "documents.batch",
     request_body = BatchCreateDocumentRequest,
     responses(
         (status = 202, description = "Batch accepted for processing", body = BatchCreateDocumentResponse),
@@ -262,6 +264,7 @@ pub async fn batch_create_documents(
     post,
     path = "/api/v1/documents:upload",
     tag = "documents",
+    operation_id = "documents.upload",
     request_body(content_type = "multipart/form-data", content = String, description = "File upload with optional containerTag and metadata fields"),
     responses(
         (status = 202, description = "Upload accepted for processing", body = CreateDocumentResponse),
@@ -413,6 +416,7 @@ pub async fn upload_document(
     get,
     path = "/api/v1/documents/{documentId}",
     tag = "documents",
+    operation_id = "documents.get",
     params(("documentId" = String, Path, description = "Document ID or custom ID")),
     responses(
         (status = 200, description = "Document found", body = DocumentResponse),
@@ -447,6 +451,7 @@ pub async fn get_document(
     patch,
     path = "/api/v1/documents/{documentId}",
     tag = "documents",
+    operation_id = "documents.update",
     params(("documentId" = String, Path, description = "Document ID")),
     request_body = UpdateDocumentRequest,
     responses(
@@ -495,6 +500,7 @@ pub async fn update_document(
     delete,
     path = "/api/v1/documents/{documentId}",
     tag = "documents",
+    operation_id = "documents.delete",
     params(("documentId" = String, Path, description = "Document ID or custom ID")),
     responses(
         (status = 200, description = "Document deleted", body = Object),
@@ -532,6 +538,7 @@ pub async fn delete_document(
     get,
     path = "/api/v1/documents",
     tag = "documents",
+    operation_id = "documents.list",
     params(ListDocumentsQuery),
     responses(
         (status = 200, description = "Documents listed", body = ListDocumentsResponse),
@@ -593,6 +600,7 @@ pub async fn list_documents(
     get,
     path = "/api/v1/ingestions/{ingestionId}",
     tag = "documents",
+    operation_id = "documents.getIngestionStatus",
     params(("ingestionId" = String, Path, description = "Ingestion ID (same as document ID)")),
     responses(
         (status = 200, description = "Ingestion status", body = IngestionStatusResponse),

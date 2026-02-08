@@ -104,6 +104,7 @@ fn parse_relation_types(input: &str) -> Vec<GraphEdgeType> {
     get,
     path = "/api/v1/memories/{memoryId}/graph",
     tag = "graph",
+    operation_id = "graph.getMemory",
     params(
         ("memoryId" = String, Path, description = "Memory ID"),
         MemoryGraphParams,
@@ -153,6 +154,7 @@ pub async fn get_memory_graph(
     get,
     path = "/api/v1/containers/{tag}/graph",
     tag = "graph",
+    operation_id = "graph.getContainer",
     params(
         ("tag" = String, Path, description = "Container tag"),
         ContainerGraphParams,

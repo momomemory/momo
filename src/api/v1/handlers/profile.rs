@@ -17,6 +17,7 @@ use crate::models::GetProfileRequest;
     post,
     path = "/api/v1/profile:compute",
     tag = "profile",
+    operation_id = "profile.compute",
     request_body = ComputeProfileRequest,
     responses(
         (status = 200, description = "Profile computed", body = ProfileResponse),

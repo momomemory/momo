@@ -27,6 +27,7 @@ use crate::models::{
     post,
     path = "/api/v1/search",
     tag = "search",
+    operation_id = "search.search",
     request_body = SearchRequest,
     responses(
         (status = 200, description = "Search results", body = SearchResponse),

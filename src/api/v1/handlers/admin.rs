@@ -13,6 +13,7 @@ use crate::services::ForgettingManager;
     post,
     path = "/api/v1/admin/forgetting:run",
     tag = "admin",
+    operation_id = "admin.runForgetting",
     responses(
         (status = 200, description = "Forgetting cycle completed", body = ForgettingRunResponse),
     ),

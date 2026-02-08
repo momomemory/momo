@@ -16,6 +16,7 @@ use crate::models::{ConversationMessage, ConversationResponse, MemoryType};
     post,
     path = "/api/v1/conversations:ingest",
     tag = "conversation",
+    operation_id = "conversation.ingest",
     request_body = ConversationIngestRequest,
     responses(
         (status = 200, description = "Conversation ingested", body = ConversationIngestResponse),

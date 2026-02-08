@@ -50,6 +50,7 @@ pub struct RerankerStatus {
     get,
     path = "/api/v1/health",
     tag = "health",
+    operation_id = "health.get",
     responses(
         (status = 200, description = "Service health status", body = HealthData),
     )

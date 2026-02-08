@@ -16,6 +16,7 @@ use crate::models::MemoryType;
     post,
     path = "/api/v1/memories",
     tag = "memories",
+    operation_id = "memories.create",
     request_body = CreateMemoryRequest,
     responses(
         (status = 201, description = "Memory created", body = MemoryResponse),
@@ -66,6 +67,7 @@ pub async fn create_memory(
     get,
     path = "/api/v1/memories/{memoryId}",
     tag = "memories",
+    operation_id = "memories.get",
     params(("memoryId" = String, Path, description = "Memory ID")),
     responses(
         (status = 200, description = "Memory found", body = MemoryResponse),
@@ -88,6 +90,7 @@ pub async fn get_memory(
     patch,
     path = "/api/v1/memories/{memoryId}",
     tag = "memories",
+    operation_id = "memories.update",
     params(("memoryId" = String, Path, description = "Memory ID")),
     request_body = UpdateMemoryRequest,
     responses(
@@ -133,6 +136,7 @@ pub async fn update_memory(
     delete,
     path = "/api/v1/memories/{memoryId}",
     tag = "memories",
+    operation_id = "memories.forgetById",
     params(("memoryId" = String, Path, description = "Memory ID")),
     request_body(content = ForgetMemoryRequest, description = "Optional reason for deletion"),
     responses(
@@ -181,6 +185,7 @@ pub async fn delete_memory(
     get,
     path = "/api/v1/memories",
     tag = "memories",
+    operation_id = "memories.list",
     params(ListMemoriesQuery),
     responses(
         (status = 200, description = "Memories listed", body = ListMemoriesResponse),
@@ -283,6 +288,7 @@ pub async fn list_memories(
     post,
     path = "/api/v1/memories:forget",
     tag = "memories",
+    operation_id = "memories.forget",
     request_body = ContentForgetRequest,
     responses(
         (status = 200, description = "Memory forgotten", body = ForgetMemoryResponse),
