@@ -1,0 +1,13 @@
+pub mod api;
+pub mod config;
+pub mod db;
+pub mod embeddings;
+pub mod error;
+pub mod intelligence;
+pub mod llm;
+pub mod models;
+pub mod ocr;
+pub mod processing;
+pub mod search;
+pub mod services;
+pub mod transcription;

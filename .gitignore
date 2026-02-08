@@ -1,0 +1,11 @@
+/target
+*.db
+*.db-shm
+*.db-wal
+.env
+.env.local
+.fastembed_cache/
+.sisyphus/
+tests/fixtures/
+test_db_*
+.DS_Store

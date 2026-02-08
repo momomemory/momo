@@ -1,0 +1,148 @@
+[package]
+name = "momo"
+version.workspace = true
+edition.workspace = true
+authors.workspace = true
+description = "Open-source, self-hostable AI memory system inspired by Supermemory. Named after Aang's loyal flying lemur."
+license.workspace = true
+repository.workspace = true
+keywords.workspace = true
+categories.workspace = true
+rust-version.workspace = true
+
+[lib]
+name = "momo"
+path = "src/lib.rs"
+
+[[bin]]
+name = "momo"
+path = "src/main.rs"
+
+[dependencies]
+# Web Framework
+axum = { workspace = true }
+axum-extra = { workspace = true }
+tower = { workspace = true }
+tower-http = { workspace = true }
+
+# OpenAPI Documentation
+utoipa = { workspace = true }
+utoipa-axum = { workspace = true }
+utoipa-redoc = { workspace = true }
+
+# Async Runtime
+tokio = { workspace = true }
+tokio-util = { workspace = true }
+
+# CLI
+clap = { workspace = true }
+
+# Database
+libsql = { workspace = true }
+lru = { workspace = true }
+
+# Embeddings
+fastembed = { workspace = true }
+
+# LLM
+async-openai = { workspace = true }
+backoff = { workspace = true }
+
+# Serialization
+serde = { workspace = true }
+serde_json = { workspace = true }
+
+# HTTP Client
+reqwest = { workspace = true }
+
+# Error Handling
+anyhow = { workspace = true }
+thiserror = { workspace = true }
+
+# IDs
+nanoid = { workspace = true }
+uuid = { workspace = true }
+
+# Validation
+validator = { workspace = true }
+
+# Logging & Tracing
+tracing = { workspace = true }
+tracing-subscriber = { workspace = true }
+
+# Configuration
+dotenvy = { workspace = true }
+config = { workspace = true }
+
+# Time & Date
+chrono = { workspace = true }
+
+# Text Processing
+regex = { workspace = true }
+unicode-segmentation = { workspace = true }
+html2text = { workspace = true }
+htmd = { workspace = true }
+scraper = { workspace = true }
+url = { workspace = true }
+
+# AST-aware code chunking
+text-splitter = { workspace = true }
+tree-sitter = { workspace = true }
+tree-sitter-rust = { workspace = true }
+tree-sitter-python = { workspace = true }
+tree-sitter-javascript = { workspace = true }
+tree-sitter-typescript = { workspace = true }
+tree-sitter-go = { workspace = true }
+tree-sitter-java = { workspace = true }
+tree-sitter-c = { workspace = true }
+tree-sitter-cpp = { workspace = true }
+
+# Async utilities
+futures = { workspace = true }
+async-trait = { workspace = true }
+async-stream = { workspace = true }
+
+# Base64 encoding
+base64 = { workspace = true }
+
+# Hashing
+sha2 = { workspace = true }
+
+# Content type detection
+infer = { workspace = true }
+
+# PDF extraction
+pdf-extract = { workspace = true }
+
+# OCR
+leptess = { workspace = true }
+
+# Image processing
+image = { workspace = true }
+
+# Audio transcription
+whisper-rs = { workspace = true }
+symphonia = { workspace = true }
+rubato = { workspace = true }
+
+# Markdown
+pulldown-cmark = { workspace = true }
+
+# Office document extraction
+docx-rs = { workspace = true }
+calamine = { workspace = true }
+zip = { workspace = true }
+quick-xml = { workspace = true }
+csv = { workspace = true }
+
+[dev-dependencies]
+tokio-test = { workspace = true }
+pretty_assertions = { workspace = true }
+tempfile = { workspace = true }
+wiremock = { workspace = true }
+serial_test = { workspace = true }
+
+[features]
+default = ["local-embeddings"]
+local-embeddings = []
+openai-embeddings = []
