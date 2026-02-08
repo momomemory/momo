@@ -67,33 +67,37 @@ DATABASE_URL=file:my-memory.db MOMO_PORT=8080 ./target/release/momo
 ### Add a document
 
 ```bash
-curl -X POST http://localhost:3000/v3/documents \
+curl -X POST http://localhost:3000/api/v1/documents \
   -H "Content-Type: application/json" \
-  -d '{"content": "https://example.com/article", "container_tag": "user_123"}'
+  -H "Authorization: Bearer your-api-key" \
+  -d '{"content": "https://example.com/article", "containerTag": "user_123"}'
 ```
 
 ### Search documents
 
 ```bash
-curl -X POST http://localhost:3000/v3/search \
+curl -X POST http://localhost:3000/api/v1/search \
   -H "Content-Type: application/json" \
-  -d '{"q": "machine learning concepts", "container_tags": ["user_123"], "limit": 10}'
+  -H "Authorization: Bearer your-api-key" \
+  -d '{"q": "machine learning concepts", "containerTags": ["user_123"], "limit": 10}'
 ```
 
 ### Add a memory
 
 ```bash
-curl -X POST http://localhost:3000/v4/conversation \
+curl -X POST http://localhost:3000/api/v1/conversations:ingest \
   -H "Content-Type: application/json" \
-  -d '{"messages": [{"role": "user", "content": "I prefer dark mode"}], "container_tag": "user_123"}'
+  -H "Authorization: Bearer your-api-key" \
+  -d '{"messages": [{"role": "user", "content": "I prefer dark mode"}], "containerTag": "user_123"}'
 ```
 
 ### Search memories
 
 ```bash
-curl -X POST http://localhost:3000/v4/search \
+curl -X POST http://localhost:3000/api/v1/search \
   -H "Content-Type: application/json" \
-  -d '{"q": "user preferences", "container_tag": "user_123", "searchMode": "hybrid"}'
+  -H "Authorization: Bearer your-api-key" \
+  -d '{"q": "user preferences", "containerTags": ["user_123"], "scope": "hybrid"}'
 ```
 
 ## Features
@@ -238,23 +242,22 @@ LLM_API_KEY=sk-...
 
 ```bash
 # Create initial memory
-curl -X POST http://localhost:3000/v4/conversation \
+curl -X POST http://localhost:3000/api/v1/conversations:ingest \
   -H 'Content-Type: application/json' \
+  -H "Authorization: Bearer your-api-key" \
   -d '{
     "messages": [{"role": "user", "content": "My favorite color is blue"}],
-    "container_tag": "user_123"
+    "containerTag": "user_123"
   }'
 
 # Create contradictory memory
-curl -X POST http://localhost:3000/v4/conversation \
+curl -X POST http://localhost:3000/api/v1/conversations:ingest \
   -H 'Content-Type: application/json' \
+  -H "Authorization: Bearer your-api-key" \
   -d '{
     "messages": [{"role": "user", "content": "My favorite color is red"}],
-    "container_tag": "user_123"
+    "containerTag": "user_123"
   }'
-
-# Result: First memory is marked not latest, second memory has parent link
-# Version chain: blue (v1, is_latest=false) -> red (v2, is_latest=true)
 ```
 
 ### Database State
@@ -282,11 +285,11 @@ WHERE container_tag = 'user_123';
 ┌──────────────────────────────────────────────────────────────┐
 │                        Momo Server                           │
 ├──────────────────────────────────────────────────────────────┤
-│  ┌────────────┐  ┌────────────┐  ┌────────────┐             │
-│  │  v3 API    │  │  v4 API    │  │  Admin API │             │
-│  │  Documents │  │  Memories  │  │  (authed)  │             │
-│  └─────┬──────┘  └─────┬──────┘  └─────┬──────┘             │
-│        └───────────────┬───────────────┘                     │
+│  ┌───────────────────────────────┐  ┌────────────┐           │
+│  │  REST API (v1)                │  │  Admin API │           │
+│  │  Documents · Memories · Search│  │  (authed)  │           │
+│  └─────┬─────────────────────────┘  └─────┬──────┘           │
+│        └───────────────┬──────────────────┘                   │
 │  ┌─────────────────────┴─────────────────────────────────┐   │
 │  │                  Services Layer                        │   │
 │  │  SearchService  MemoryService  ProcessingPipeline      │   │
@@ -581,170 +584,183 @@ docker run -p 3000:3000 -v ./data:/data momo
 
 ## Migration Notes
 
-### Memory Similarity Scores (v4)
+### Memory Similarity Scores
 
-In previous versions, memory similarity scores were incorrectly scaled. As of the hybrid search update, memory similarity scores now correctly reflect the raw vector similarity score (0.0 to 1.0). If your application logic relied on the previous incorrect scaling, you may need to adjust your thresholds.
+In the migration from v4 to v1, memory similarity scores were correctly scaled to reflect the raw vector similarity score (0.0 to 1.0). In previous versions, these scores were incorrectly scaled. If your application logic relied on the previous incorrect scaling, you may need to adjust your thresholds.
 
 ## API
 
 ### Health Check
 
 ```bash
-curl http://localhost:3000/health
+curl http://localhost:3000/api/v1/health
 ```
 
-### Documents (v3)
+### Documents
 
 **Add Document**
 ```bash
-curl -X POST http://localhost:3000/v3/documents \
+curl -X POST http://localhost:3000/api/v1/documents \
   -H "Content-Type: application/json" \
   -H "Authorization: Bearer your-api-key" \
   -d '{
     "content": "https://example.com/article",
-    "container_tag": "user_123",
+    "containerTag": "user_123",
     "metadata": {"category": "tech"}
   }'
 ```
 
 **Upload Document File**
 ```bash
-curl -X POST http://localhost:3000/v3/documents/file \
+curl -X POST http://localhost:3000/api/v1/documents:upload \
   -H "Authorization: Bearer your-api-key" \
   -F "file=@document.pdf" \
-  -F "container_tag=user_123"
+  -F "containerTag=user_123"
 ```
 
 **Batch Add**
 ```bash
-curl -X POST http://localhost:3000/v3/documents/batch \
+curl -X POST http://localhost:3000/api/v1/documents:batch \
   -H "Content-Type: application/json" \
+  -H "Authorization: Bearer your-api-key" \
   -d '{
     "documents": [
       {"content": "First document..."},
       {"content": "Second document..."}
     ],
-    "container_tag": "project_abc"
+    "containerTag": "project_abc"
   }'
 ```
 
 **Get Document**
 ```bash
-curl http://localhost:3000/v3/documents/{id}
+curl http://localhost:3000/api/v1/documents/{documentId} \
+  -H "Authorization: Bearer your-api-key"
 ```
 
 **Update Document**
 ```bash
-curl -X PATCH http://localhost:3000/v3/documents/{id} \
+curl -X PATCH http://localhost:3000/api/v1/documents/{documentId} \
   -H "Content-Type: application/json" \
+  -H "Authorization: Bearer your-api-key" \
   -d '{"metadata": {"category": "updated"}}'
 ```
 
 **Delete Document**
 ```bash
-curl -X DELETE http://localhost:3000/v3/documents/{id}
+curl -X DELETE http://localhost:3000/api/v1/documents/{documentId} \
+  -H "Authorization: Bearer your-api-key"
 ```
 
 **Search Documents**
 ```bash
-curl -X POST http://localhost:3000/v3/search \
+curl -X POST http://localhost:3000/api/v1/search \
   -H "Content-Type: application/json" \
+  -H "Authorization: Bearer your-api-key" \
   -d '{
     "q": "machine learning concepts",
-    "container_tags": ["user_123"],
+    "containerTags": ["user_123"],
     "limit": 10,
-    "chunk_threshold": 0.5,
+    "threshold": 0.5,
     "rerank": true
   }'
 ```
 
 **List Documents**
 ```bash
-curl -X POST http://localhost:3000/v3/documents/list \
-  -H "Content-Type: application/json" \
-  -d '{
-    "container_tags": ["user_123"],
-    "limit": 20,
-    "page": 1
-  }'
+curl "http://localhost:3000/api/v1/documents?containerTags=user_123&limit=20" \
+  -H "Authorization: Bearer your-api-key"
 ```
 
 **Get Processing Status**
 ```bash
-curl http://localhost:3000/v3/documents/processing
+curl http://localhost:3000/api/v1/ingestions/{ingestionId} \
+  -H "Authorization: Bearer your-api-key"
 ```
 
-### Memories (v4)
+### Memories
 
 **Add Conversation**
 ```bash
-curl -X POST http://localhost:3000/v4/conversation \
+curl -X POST http://localhost:3000/api/v1/conversations:ingest \
   -H "Content-Type: application/json" \
+  -H "Authorization: Bearer your-api-key" \
   -d '{
     "messages": [{"role": "user", "content": "I prefer dark mode"}],
-    "container_tag": "user_123"
+    "containerTag": "user_123"
   }'
 ```
 
-**Search Memories (Hybrid)**
+**Search Memories**
 ```bash
-curl -X POST http://localhost:3000/v4/search \
+curl -X POST http://localhost:3000/api/v1/search \
   -H "Content-Type: application/json" \
+  -H "Authorization: Bearer your-api-key" \
   -d '{
     "q": "user preferences",
-    "container_tag": "user_123",
-    "searchMode": "hybrid",
+    "containerTags": ["user_123"],
+    "scope": "hybrid",
     "threshold": 0.6,
     "limit": 10
   }'
 ```
 
-**Search Modes**
-- `hybrid` (default): Searches both extracted memories and raw document chunks. Results are deduplicated so that if a memory exists for a chunk, only the memory is returned.
-- `memories`: Searches only the refined memory layer.
-- `documents`: Redirects to document search (use `/v3/search` for document-only).
+**Search Scopes** (via the `scope` field)
+- `Hybrid` (default): Searches both memories and document chunks. Results are deduplicated.
+- `Memories`: Searches only the refined memory layer.
+- `Documents`: Searches only document chunks.
 
 **Update Memory**
 ```bash
-curl -X PATCH http://localhost:3000/v4/memories \
+curl -X PATCH http://localhost:3000/api/v1/memories/{memoryId} \
   -H "Content-Type: application/json" \
+  -H "Authorization: Bearer your-api-key" \
   -d '{
-    "content": "User prefers dark mode",
-    "container_tag": "user_123",
-    "new_content": "User now prefers light mode"
+    "content": "User now prefers light mode"
   }'
 ```
 
-**Forget Memory**
+**Forget Memory (by ID)**
 ```bash
-curl -X DELETE http://localhost:3000/v4/memories \
+curl -X DELETE http://localhost:3000/api/v1/memories/{memoryId} \
+  -H "Authorization: Bearer your-api-key" \
+  -d '{"reason": "User changed their mind"}'
+```
+
+**Forget Memory (by content)**
+```bash
+curl -X POST http://localhost:3000/api/v1/memories:forget \
   -H "Content-Type: application/json" \
+  -H "Authorization: Bearer your-api-key" \
   -d '{
     "content": "Outdated preference",
-    "container_tag": "user_123",
+    "containerTag": "user_123",
     "reason": "User changed their mind"
   }'
 ```
 
 **Get User Profile**
 ```bash
-curl -X POST http://localhost:3000/v4/profile \
+curl -X POST http://localhost:3000/api/v1/profile:compute \
   -H "Content-Type: application/json" \
+  -H "Authorization: Bearer your-api-key" \
   -d '{
-    "container_tag": "user_123",
-    "include_dynamic": true,
+    "containerTag": "user_123",
+    "includeDynamic": true,
     "limit": 50
   }'
 ```
 
 **Get Memory Graph**
 ```bash
-curl http://localhost:3000/v4/memories/{id}/graph
+curl http://localhost:3000/api/v1/memories/{memoryId}/graph \
+  -H "Authorization: Bearer your-api-key"
 ```
 
 **Get Container Graph**
 ```bash
-curl http://localhost:3000/v4/containers/{tag}/graph
+curl http://localhost:3000/api/v1/containers/{tag}/graph \
+  -H "Authorization: Bearer your-api-key"
 ```
 
 ### Admin
@@ -753,7 +769,7 @@ All admin endpoints require authentication via `MOMO_API_KEYS`.
 
 **Trigger Forgetting Cycle**
 ```bash
-curl -X POST http://localhost:3000/admin/run-forgetting \
+curl -X POST http://localhost:3000/api/v1/admin/forgetting:run \
   -H "Authorization: Bearer your-api-key"
 ```
 
