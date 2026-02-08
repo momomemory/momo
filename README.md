@@ -281,39 +281,42 @@ WHERE container_tag = 'user_123';
 
 ## Architecture
 
-```
-┌──────────────────────────────────────────────────────────────┐
-│                        Momo Server                           │
-├──────────────────────────────────────────────────────────────┤
-│  ┌───────────────────────────────┐  ┌────────────┐           │
-│  │  REST API (v1)                │  │  Admin API │           │
-│  │  Documents · Memories · Search│  │  (authed)  │           │
-│  └─────┬─────────────────────────┘  └─────┬──────┘           │
-│        └───────────────┬──────────────────┘                   │
-│  ┌─────────────────────┴─────────────────────────────────┐   │
-│  │                  Services Layer                        │   │
-│  │  SearchService  MemoryService  ProcessingPipeline      │   │
-│  │  ForgettingManager  EpisodeDecay  ProfileRefresh       │   │
-│  └─────────────────────┬─────────────────────────────────┘   │
-│        ┌───────────────┼───────────────┐                     │
-│  ┌─────┴──────┐  ┌─────┴──────┐  ┌────┴───────────┐         │
-│  │ Intelligence│  │ Processing │  │  Embeddings    │         │
-│  │ Inference   │  │ Extract    │  │  FastEmbed     │         │
-│  │ Contradict  │  │ Chunk      │  │  or API        │         │
-│  │ Filter      │  │ Embed      │  │  + Reranker    │         │
-│  └─────────────┘  └────────────┘  └────────────────┘         │
-│                         │                                    │
-│  ┌──────────────────────┴────────────────────────────────┐   │
-│  │           Database Layer (LibSQL / Turso)              │   │
-│  │  Documents  Chunks  Memories  Vectors  Relationships  │   │
-│  └───────────────────────────────────────────────────────┘   │
-│                                                              │
-│  ┌────────────┐  ┌──────────────┐  ┌───────────────────┐     │
-│  │ OCR        │  │ Transcription│  │  LLM Provider     │     │
-│  │ Tesseract  │  │ Whisper      │  │  OpenAI/Ollama/   │     │
-│  │ or API     │  │ or API       │  │  OpenRouter/Local  │     │
-│  └────────────┘  └──────────────┘  └───────────────────┘     │
-└──────────────────────────────────────────────────────────────┘
+```mermaid
+graph TD
+    subgraph MomoServer["Momo Server"]
+        subgraph API["API Layer"]
+            REST["REST API (v1)<br/>Documents · Memories · Search"]
+            Admin["Admin API<br/>(authed)"]
+        end
+        subgraph Services["Services Layer"]
+            SearchSvc["SearchService"]
+            MemorySvc["MemoryService"]
+            Pipeline["ProcessingPipeline"]
+            Forgetting["ForgettingManager"]
+            Decay["EpisodeDecay"]
+            Profile["ProfileRefresh"]
+        end
+        subgraph Core["Core Modules"]
+            Intelligence["Intelligence<br/>Inference · Contradict · Filter"]
+            Processing["Processing<br/>Extract · Chunk · Embed"]
+            Embeddings["Embeddings<br/>FastEmbed or API · Reranker"]
+        end
+        subgraph DB["Database Layer (LibSQL / Turso)"]
+            Documents["Documents"]
+            Chunks["Chunks"]
+            Memories["Memories"]
+            Vectors["Vectors"]
+            Relationships["Relationships"]
+        end
+        subgraph Providers["External Providers"]
+            OCR["OCR<br/>Tesseract or API"]
+            Transcription["Transcription<br/>Whisper or API"]
+            LLM["LLM Provider<br/>OpenAI / Ollama /<br/>OpenRouter / Local"]
+        end
+        REST & Admin --> Services
+        Services --> Intelligence & Processing & Embeddings
+        Processing --> DB
+    end
 ```
 
 ## Supported Embedding Models
