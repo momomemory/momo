@@ -119,7 +119,7 @@ impl SearchService {
         }
 
         let query_len = req.q.len();
-        if query_len < 3 || query_len > 500 {
+        if !(3..=500).contains(&query_len) {
             return None;
         }
 
@@ -188,7 +188,7 @@ impl SearchService {
         }
 
         let query_len = req.q.len();
-        if query_len < 3 || query_len > 500 {
+        if !(3..=500).contains(&query_len) {
             return None;
         }
 
@@ -355,8 +355,7 @@ impl SearchService {
 
                     let config_top_k = self
                         .reranker
-                        .as_ref()
-                        .and_then(|_| Some(100))
+                        .as_ref().map(|_| 100)
                         .unwrap_or(100);
                     let rerank_top_k = req.rerank_top_k.unwrap_or(config_top_k);
 
@@ -1083,7 +1082,8 @@ impl SearchService {
 mod tests {
     use super::*;
     use crate::config::{Config, EmbeddingsConfig};
-    use crate::db::{ChunkRepository, Database, DocumentRepository, LibSqlBackend, MemoryRepository, MemorySourcesRepository};
+    use crate::db::{Database, LibSqlBackend};
+    use crate::db::repository::{ChunkRepository, DocumentRepository, MemoryRepository, MemorySourcesRepository};
     use crate::embeddings::RerankResult;
     use crate::llm::LlmProvider;
     use crate::models::{Document, Memory, MemoryType, ProcessingStatus};
@@ -1152,11 +1152,11 @@ mod tests {
 
     #[test]
     fn test_rerank_level_determination() {
-        assert_eq!(determine_rerank_level("chunk", 10), true);
-        assert_eq!(determine_rerank_level("document", 10), false);
-        assert_eq!(determine_rerank_level("auto", 10), true);
-        assert_eq!(determine_rerank_level("auto", 25), false);
-        assert_eq!(determine_rerank_level("invalid", 10), true);
+        assert!(determine_rerank_level("chunk", 10));
+        assert!(!determine_rerank_level("document", 10));
+        assert!(determine_rerank_level("auto", 10));
+        assert!(!determine_rerank_level("auto", 25));
+        assert!(determine_rerank_level("invalid", 10));
     }
 
     fn determine_rerank_level(level: &str, total_chunks: usize) -> bool {
@@ -1417,7 +1417,7 @@ mod tests {
 
         for (index, content) in chunk_contents.iter().enumerate() {
             let chunk = crate::models::Chunk {
-                id: format!("chunk_{}_{}", doc_id, index),
+                id: format!("chunk_{doc_id}_{index}"),
                 document_id: doc_id.to_string(),
                 content: content.to_string(),
                 embedded_content: None,
@@ -1444,7 +1444,7 @@ mod tests {
     ) -> Memory {
         let mut memory = Memory::new(
             memory_id.to_string(),
-            format!("Memory {}", memory_id),
+            format!("Memory {memory_id}"),
             "default".to_string(),
         );
         memory.container_tag = container_tag.map(|tag| tag.to_string());

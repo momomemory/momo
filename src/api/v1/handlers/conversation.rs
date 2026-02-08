@@ -47,7 +47,7 @@ pub async fn ingest_conversation(
         .config
         .llm
         .as_ref()
-        .map_or(false, |l| l.enable_contradiction_detection)
+        .is_some_and(|l| l.enable_contradiction_detection)
     {
         match state
             .extractor

@@ -42,7 +42,7 @@ impl CodeChunker {
         let mut prefix_parts: Vec<String> = Vec::new();
 
         if let Some(ref path) = context.source_path {
-            prefix_parts.push(format!("# File: {}", path));
+            prefix_parts.push(format!("# File: {path}"));
         }
 
         let imports = Self::extract_imports(full_source);
@@ -181,7 +181,6 @@ impl ContentChunker for CodeChunker {
                 let enriched_content = self.add_context_prefix(chunk_text, text, &context);
                 TextChunk {
                     content: enriched_content,
-                    position: i,
                     token_count: (chunk_text.len() as f32 / 4.0).ceil() as i32,
                 }
             })
@@ -208,7 +207,6 @@ mod tests {
         let chunker = CodeChunker::default();
         let context = ChunkContext {
             source_path: Some("src/main.rs".to_string()),
-            doc_type: None,
         };
 
         let code = r#"
@@ -344,7 +342,6 @@ fn incomplete {
         let chunker = CodeChunker::default();
         let context = ChunkContext {
             source_path: Some("src/main.rs".to_string()),
-            doc_type: None,
         };
 
         let code = r#"
@@ -446,8 +443,7 @@ fn main() {}
         let imports = CodeChunker::extract_imports(source);
         assert!(
             imports.len() >= 4,
-            "Should extract multiple import types, got: {:?}",
-            imports
+            "Should extract multiple import types, got: {imports:?}"
         );
     }
 
@@ -466,8 +462,7 @@ fn beta() {
         let siblings = CodeChunker::extract_sibling_signatures(source, chunk);
         assert!(
             siblings.iter().any(|s| s.contains("beta")),
-            "Siblings should include beta, got: {:?}",
-            siblings
+            "Siblings should include beta, got: {siblings:?}"
         );
         assert!(
             !siblings.iter().any(|s| s.contains("alpha")),

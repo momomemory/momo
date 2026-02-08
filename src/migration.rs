@@ -48,11 +48,10 @@ pub async fn check_dimension_compatibility(
 
             print!(
                 "\nEmbedding dimension mismatch detected!\n\
-                 Database: {} dimensions\n\
-                 Model: {} dimensions\n\n\
+                 Database: {db_dims} dimensions\n\
+                 Model: {model_dimensions} dimensions\n\n\
                  This requires re-embedding all documents.\n\
-                 Proceed with migration? [y/N]: ",
-                db_dims, model_dimensions
+                 Proceed with migration? [y/N]: "
             );
             io::stdout().flush()?;
 

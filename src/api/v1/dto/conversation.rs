@@ -18,9 +18,6 @@ pub struct ConversationIngestRequest {
     pub container_tag: String,
     /// Session ID for grouping related conversations.
     pub session_id: Option<String>,
-    /// Arbitrary metadata for the conversation.
-    #[schema(value_type = Option<Object>)]
-    pub metadata: Option<Metadata>,
     /// Memory type to assign to extracted memories.
     pub memory_type: Option<V1MemoryType>,
 }

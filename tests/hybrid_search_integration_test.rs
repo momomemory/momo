@@ -125,11 +125,11 @@ async fn setup_test_app() -> (SocketAddr, TempDir, MockServer) {
 async fn test_hybrid_search_workflow() {
     let (addr, _temp_dir, _mock_server) = setup_test_app().await;
     let client = reqwest::Client::new();
-    let base_url = format!("http://{}", addr);
+    let base_url = format!("http://{addr}");
 
     // 1. Upload document with extract_memories=true
     let doc_res = client
-        .post(format!("{}/v3/documents", base_url))
+        .post(format!("{base_url}/v3/documents"))
         .json(&json!({
             "content": "Rust is safe and fast. It is a systems programming language.",
             "container_tag": "integration_test",
@@ -150,7 +150,7 @@ async fn test_hybrid_search_workflow() {
     for _ in 0..10 {
         tokio::time::sleep(tokio::time::Duration::from_millis(500)).await;
         let check_res = client
-            .get(format!("{}/v3/documents/{}", base_url, doc_id))
+            .get(format!("{base_url}/v3/documents/{doc_id}"))
             .send()
             .await
             .expect("Failed to check status");
@@ -167,7 +167,7 @@ async fn test_hybrid_search_workflow() {
 
     // 3. Perform hybrid search
     let search_res = client
-        .post(format!("{}/v4/search", base_url))
+        .post(format!("{base_url}/v4/search"))
         .json(&json!({
             "q": "rust",
             "container_tag": "integration_test",
@@ -199,7 +199,7 @@ async fn test_hybrid_search_workflow() {
 
     // Memories only
     let mem_only_res = client
-        .post(format!("{}/v4/search", base_url))
+        .post(format!("{base_url}/v4/search"))
         .json(&json!({
             "q": "rust",
             "container_tag": "integration_test",
@@ -217,7 +217,7 @@ async fn test_hybrid_search_workflow() {
 
     // Hybrid explicit
     let hybrid_res = client
-        .post(format!("{}/v4/search", base_url))
+        .post(format!("{base_url}/v4/search"))
         .json(&json!({
             "q": "rust",
             "container_tag": "integration_test",
@@ -230,7 +230,7 @@ async fn test_hybrid_search_workflow() {
 
     // Documents (should return 400 for /v4/search as per handler logic)
     let doc_mode_res = client
-        .post(format!("{}/v4/search", base_url))
+        .post(format!("{base_url}/v4/search"))
         .json(&json!({
             "q": "rust",
             "container_tag": "integration_test",
@@ -246,10 +246,10 @@ async fn test_hybrid_search_workflow() {
 async fn test_hybrid_search_empty_results() {
     let (addr, _temp_dir, _mock_server) = setup_test_app().await;
     let client = reqwest::Client::new();
-    let base_url = format!("http://{}", addr);
+    let base_url = format!("http://{addr}");
 
     let search_res = client
-        .post(format!("{}/v4/search", base_url))
+        .post(format!("{base_url}/v4/search"))
         .json(&json!({
             "q": "nonexistent",
             "container_tag": "empty_test"

@@ -45,7 +45,7 @@ impl ProcessingPipeline {
         let enable_contradiction_detection = config
             .llm
             .as_ref()
-            .map_or(false, |l| l.enable_contradiction_detection);
+            .is_some_and(|l| l.enable_contradiction_detection);
         Self {
             db,
             embeddings,
@@ -68,7 +68,7 @@ impl ProcessingPipeline {
             .get_document_by_id(doc_id)
             .await?
             .ok_or_else(|| {
-                crate::error::MomoError::NotFound(format!("Document {} not found", doc_id))
+                crate::error::MomoError::NotFound(format!("Document {doc_id} not found"))
             })?;
 
         self.db
@@ -158,7 +158,7 @@ impl ProcessingPipeline {
                         .reasoning
                         .as_deref()
                         .unwrap_or("Content filtered by LLM");
-                    let error_message = format!("Filtered: {}", reason);
+                    let error_message = format!("Filtered: {reason}");
                     
                     tracing::info!(
                         container_tag = %container_tag,
@@ -197,7 +197,6 @@ impl ProcessingPipeline {
         // Create chunk context with source_path and doc_type from ExtractedContent
         let chunk_context = ChunkContext {
             source_path: extracted.source_path.clone(),
-            doc_type: Some(extracted.doc_type.clone()),
         };
 
         // Use registry to route to appropriate chunker based on document type
@@ -433,7 +432,7 @@ impl ProcessingPipeline {
 
         let bytes = base64::Engine::decode(&base64::engine::general_purpose::STANDARD, content)
             .map_err(|e| {
-                crate::error::MomoError::Processing(format!("Failed to decode base64 image: {}", e))
+                crate::error::MomoError::Processing(format!("Failed to decode base64 image: {e}"))
             })?;
 
         let extracted = ImageExtractor::extract(&bytes, &self.ocr, &self.ocr_config).await?;
@@ -462,7 +461,7 @@ impl ProcessingPipeline {
 
         let bytes = base64::Engine::decode(&base64::engine::general_purpose::STANDARD, content)
             .map_err(|e| {
-                crate::error::MomoError::Processing(format!("Failed to decode base64 audio: {}", e))
+                crate::error::MomoError::Processing(format!("Failed to decode base64 audio: {e}"))
             })?;
 
         let extracted =
@@ -493,7 +492,7 @@ impl ProcessingPipeline {
 
         let bytes = base64::Engine::decode(&base64::engine::general_purpose::STANDARD, content)
             .map_err(|e| {
-                crate::error::MomoError::Processing(format!("Failed to decode base64 video: {}", e))
+                crate::error::MomoError::Processing(format!("Failed to decode base64 video: {e}"))
             })?;
 
         let extracted =
@@ -545,7 +544,8 @@ impl Clone for ProcessingPipeline {
 mod tests {
     use super::*;
     use crate::config::{DatabaseConfig, EmbeddingsConfig, LlmConfig};
-    use crate::db::{Database, DocumentRepository, LibSqlBackend, MemoryRepository, MemorySourcesRepository};
+    use crate::db::{Database, LibSqlBackend};
+    use crate::db::repository::{DocumentRepository, MemoryRepository, MemorySourcesRepository};
     use crate::models::Document;
     use serde_json::json;
     use tempfile::tempdir;
@@ -1302,8 +1302,7 @@ mod tests {
         let err = result.unwrap_err().to_string();
         assert!(
             err.contains("unavailable") || err.contains("not available"),
-            "Error should mention unavailable: {}",
-            err
+            "Error should mention unavailable: {err}"
         );
     }
 
@@ -1452,8 +1451,7 @@ mod tests {
         let error_msg = updated_doc.error_message.unwrap();
         assert!(
             error_msg.contains("unavailable") || error_msg.contains("not available"),
-            "Error message should indicate transcription unavailability: {}",
-            error_msg
+            "Error message should indicate transcription unavailability: {error_msg}"
         );
     }
 }

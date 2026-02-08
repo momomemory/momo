@@ -6,5 +6,4 @@ mod reranker;
 mod tests;
 
 pub use provider::EmbeddingProvider;
-pub use reranker::RerankResult;
-pub use reranker::RerankerProvider;
+pub use reranker::{RerankerProvider, RerankResult};

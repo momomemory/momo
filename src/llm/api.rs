@@ -64,7 +64,7 @@ impl LlmApiClient {
             .timeout(Duration::from_secs(api_config.timeout_secs))
             .build()
             .map_err(|error| {
-                MomoError::Llm(format!("Failed to create LLM HTTP client: {}", error))
+                MomoError::Llm(format!("Failed to create LLM HTTP client: {error}"))
             })?;
 
         // Configure async-openai's internal backoff to respect our timeout.
@@ -84,10 +84,6 @@ impl LlmApiClient {
             client,
             config: api_config,
         })
-    }
-
-    pub fn base_url(&self) -> &str {
-        &self.config.base_url
     }
 
     pub async fn complete(
@@ -163,7 +159,7 @@ impl LlmApiClient {
                     tracing::debug!(response_len = content.len(), "LLM JSON response received");
                     return serde_json::from_str(&content).map_err(|e| {
                         tracing::error!(response_len = content.len(), response_preview = %&content.chars().take(100).collect::<String>(), error = %e, "Failed to parse JSON response");
-                        MomoError::Llm(format!("Failed to parse JSON response: {}", e))
+                        MomoError::Llm(format!("Failed to parse JSON response: {e}"))
                     });
                 }
                 Err(error) => {
@@ -193,50 +189,6 @@ impl LlmApiClient {
         }))
     }
 
-    pub fn complete_stream(
-        &self,
-        prompt: &str,
-    ) -> Pin<Box<dyn Stream<Item = Result<String>> + Send + 'static>> {
-        if prompt.trim().is_empty() {
-            return Box::pin(stream::once(async {
-                Err(MomoError::Validation("Prompt cannot be empty".to_string()))
-            }));
-        }
-
-        let request = match self.build_request(prompt, None, None) {
-            Ok(r) => r,
-            Err(e) => return Box::pin(stream::once(async move { Err(e) })),
-        };
-
-        let client = self.client.clone();
-
-        Box::pin(async_stream::stream! {
-            let mut api_stream = match client.chat().create_stream(request).await {
-                Ok(s) => s,
-                Err(e) => {
-                    yield Err(Self::map_openai_error(e));
-                    return;
-                }
-            };
-
-            while let Some(result) = api_stream.next().await {
-                match result {
-                    Ok(response) => {
-                        for choice in response.choices {
-                            if let Some(content) = choice.delta.content {
-                                yield Ok(content);
-                            }
-                        }
-                    }
-                    Err(e) => {
-                        yield Err(Self::map_openai_error(e));
-                        return;
-                    }
-                }
-            }
-        })
-    }
-
     fn build_request(
         &self,
         prompt: &str,
@@ -251,7 +203,7 @@ impl LlmApiClient {
                     .content(system_prompt)
                     .build()
                     .map_err(|error| {
-                        MomoError::Validation(format!("Invalid system prompt: {}", error))
+                        MomoError::Validation(format!("Invalid system prompt: {error}"))
                     })?
                     .into(),
             );
@@ -261,7 +213,7 @@ impl LlmApiClient {
             ChatCompletionRequestUserMessageArgs::default()
                 .content(prompt)
                 .build()
-                .map_err(|error| MomoError::Validation(format!("Invalid user prompt: {}", error)))?
+                .map_err(|error| MomoError::Validation(format!("Invalid user prompt: {error}")))?
                 .into(),
         );
 
@@ -270,7 +222,7 @@ impl LlmApiClient {
         Self::apply_completion_options(&mut request, options);
 
         request.build().map_err(|error| {
-            MomoError::Validation(format!("Invalid LLM completion request: {}", error))
+            MomoError::Validation(format!("Invalid LLM completion request: {error}"))
         })
     }
 
@@ -282,7 +234,7 @@ impl LlmApiClient {
         let messages = vec![ChatCompletionRequestUserMessageArgs::default()
             .content(prompt)
             .build()
-            .map_err(|error| MomoError::Validation(format!("Invalid user prompt: {}", error)))?
+            .map_err(|error| MomoError::Validation(format!("Invalid user prompt: {error}")))?
             .into()];
 
         let mut request = CreateChatCompletionRequestArgs::default();
@@ -293,7 +245,7 @@ impl LlmApiClient {
 
         request
             .build()
-            .map_err(|error| MomoError::Validation(format!("Invalid LLM JSON request: {}", error)))
+            .map_err(|error| MomoError::Validation(format!("Invalid LLM JSON request: {error}")))
     }
 
     fn apply_completion_options(
@@ -374,12 +326,11 @@ impl LlmApiClient {
                     || reqwest_error.status() == Some(reqwest::StatusCode::FORBIDDEN) =>
             {
                 Some(MomoError::Llm(format!(
-                    "LLM authentication failed: {}",
-                    reqwest_error
+                    "LLM authentication failed: {reqwest_error}"
                 )))
             }
             OpenAIError::ApiError(api_error) if Self::is_auth_api_error(api_error) => Some(
-                MomoError::Llm(format!("LLM authentication failed: {}", api_error)),
+                MomoError::Llm(format!("LLM authentication failed: {api_error}")),
             ),
             _ => None,
         }
@@ -414,13 +365,13 @@ impl LlmApiClient {
     fn map_openai_error(error: OpenAIError) -> MomoError {
         match error {
             OpenAIError::Reqwest(reqwest_error) => {
-                MomoError::Llm(format!("LLM request failed: {}", reqwest_error))
+                MomoError::Llm(format!("LLM request failed: {reqwest_error}"))
             }
             OpenAIError::ApiError(api_error) => {
-                MomoError::Llm(format!("LLM API error: {}", api_error))
+                MomoError::Llm(format!("LLM API error: {api_error}"))
             }
             OpenAIError::JSONDeserialize(err) => {
-                MomoError::Llm(format!("Failed to parse LLM response: {}", err))
+                MomoError::Llm(format!("Failed to parse LLM response: {err}"))
             }
             OpenAIError::InvalidArgument(message) => MomoError::Validation(message),
             other => MomoError::Llm(other.to_string()),

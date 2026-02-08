@@ -82,8 +82,7 @@ impl LlmFilter {
             return Ok(FilterResult {
                 decision: FilterDecision::Include,
                 reasoning: Some(format!(
-                    "Content matches filter string: {}",
-                    filter_prompt
+                    "Content matches filter string: {filter_prompt}"
                 )),
             });
         }

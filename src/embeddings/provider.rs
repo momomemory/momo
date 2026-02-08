@@ -3,16 +3,12 @@ use std::sync::Arc;
 use tokio::sync::Mutex;
 
 use crate::config::{parse_provider_model, EmbeddingsConfig};
-use crate::embeddings::api::{default_base_url, ApiConfig, EmbeddingApiClient};
 use crate::error::{MomoError, Result};
 
 enum EmbeddingBackend {
     Local {
         model: Arc<Mutex<TextEmbedding>>,
         batch_size: usize,
-    },
-    Api {
-        client: EmbeddingApiClient,
     },
 }
 
@@ -23,48 +19,16 @@ pub struct EmbeddingProvider {
 
 impl EmbeddingProvider {
     /// Sync constructor for local models only.
-    /// Returns an error if an API provider is specified.
     pub fn new(config: &EmbeddingsConfig) -> Result<Self> {
         let (provider, model_name) = parse_provider_model(&config.model);
 
         if provider != "local" {
             return Err(MomoError::Embedding(
-                "Use new_async() for API providers".to_string(),
+                format!("Unsupported embedding provider: {}. Local embeddings only.", provider)
             ));
         }
 
         Self::new_local(config, model_name)
-    }
-
-    /// Async constructor that supports both local and API providers.
-    pub async fn new_async(config: &EmbeddingsConfig) -> Result<Self> {
-        let (provider, model_name) = parse_provider_model(&config.model);
-
-        if provider == "local" {
-            return Self::new_local(config, model_name);
-        }
-
-        // API provider
-        let base_url = config
-            .base_url
-            .clone()
-            .unwrap_or_else(|| default_base_url(provider).to_string());
-
-        let api_config = ApiConfig {
-            base_url,
-            api_key: config.api_key.clone(),
-            model: model_name.to_string(),
-            timeout_secs: config.timeout_secs,
-            max_retries: config.max_retries,
-        };
-
-        let client = EmbeddingApiClient::new(api_config)?;
-        let dimensions = client.detect_dimensions().await?;
-
-        Ok(Self {
-            backend: EmbeddingBackend::Api { client },
-            dimensions,
-        })
     }
 
     fn new_local(config: &EmbeddingsConfig, model_name: &str) -> Result<Self> {
@@ -113,10 +77,6 @@ impl EmbeddingProvider {
                     .embed(texts, Some(*batch_size))
                     .map_err(|e| MomoError::Embedding(e.to_string()))
             }
-            EmbeddingBackend::Api { client } => {
-                let refs: Vec<&str> = texts.iter().map(|s| s.as_str()).collect();
-                client.embed(&refs).await
-            }
         }
     }
 
@@ -132,12 +92,8 @@ impl EmbeddingProvider {
         match &self.backend {
             EmbeddingBackend::Local { .. } => {
                 // Local models use query: prefix
-                let prefixed = format!("query: {}", query);
+                let prefixed = format!("query: {query}");
                 self.embed_single(&prefixed).await
-            }
-            EmbeddingBackend::Api { .. } => {
-                // API providers don't use prefix
-                self.embed_single(query).await
             }
         }
     }
@@ -146,12 +102,8 @@ impl EmbeddingProvider {
         match &self.backend {
             EmbeddingBackend::Local { .. } => {
                 // Local models use passage: prefix
-                let prefixed = format!("passage: {}", passage);
+                let prefixed = format!("passage: {passage}");
                 self.embed_single(&prefixed).await
-            }
-            EmbeddingBackend::Api { .. } => {
-                // API providers don't use prefix
-                self.embed_single(passage).await
             }
         }
     }
@@ -161,13 +113,9 @@ impl EmbeddingProvider {
             EmbeddingBackend::Local { .. } => {
                 let prefixed: Vec<String> = passages
                     .into_iter()
-                    .map(|p| format!("passage: {}", p))
+                    .map(|p| format!("passage: {p}"))
                     .collect();
                 self.embed(prefixed).await
-            }
-            EmbeddingBackend::Api { .. } => {
-                // API providers don't use prefix
-                self.embed(passages).await
             }
         }
     }
@@ -184,12 +132,6 @@ impl Clone for EmbeddingProvider {
                 backend: EmbeddingBackend::Local {
                     model: Arc::clone(model),
                     batch_size: *batch_size,
-                },
-                dimensions: self.dimensions,
-            },
-            EmbeddingBackend::Api { client } => Self {
-                backend: EmbeddingBackend::Api {
-                    client: client.clone(),
                 },
                 dimensions: self.dimensions,
             },

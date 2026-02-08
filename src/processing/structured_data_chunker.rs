@@ -30,14 +30,13 @@ impl ContentChunker for StructuredDataChunker {
         }
 
         // First line is header
-        let header = lines.get(0).copied().unwrap_or("");
+        let header = lines.first().copied().unwrap_or("");
         let data_rows = &lines[1..];
 
         if data_rows.is_empty() {
             // Only header, return single chunk
             return vec![TextChunk {
                 content: text.to_string(),
-                position: 0,
                 token_count: Self::estimate_tokens(text),
             }];
         }
@@ -55,7 +54,6 @@ impl ContentChunker for StructuredDataChunker {
 
             chunks.push(TextChunk {
                 content: chunk_content.trim_end().to_string(),
-                position: chunk_index,
                 token_count: Self::estimate_tokens(&chunk_content),
             });
         }
@@ -121,7 +119,7 @@ mod tests {
                                                       // 100 rows should produce multiple chunks
         let mut csv = String::from("id,name\n");
         for i in 0..100 {
-            csv.push_str(&format!("{},name{}\n", i, i));
+            csv.push_str(&format!("{i},name{i}\n"));
         }
         let chunks = chunker.chunk(&csv, None);
         assert!(
@@ -138,8 +136,6 @@ mod tests {
         let csv_text = "h1,h2\na,b\nc,d\ne,f";
         let chunks = chunker.chunk(csv_text, None);
         assert_eq!(chunks.len(), 2);
-        assert_eq!(chunks[0].position, 0);
-        assert_eq!(chunks[1].position, 1);
     }
 
     #[test]
@@ -166,7 +162,6 @@ mod tests {
         let chunker = StructuredDataChunker::default();
         let context = ChunkContext {
             source_path: Some("data.csv".to_string()),
-            doc_type: None,
         };
         let csv_text = "x,y\n1,2\n3,4";
         let chunks = chunker.chunk(csv_text, Some(&context));

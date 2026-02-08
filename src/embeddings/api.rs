@@ -54,7 +54,7 @@ impl EmbeddingApiClient {
         let client = Client::builder()
             .timeout(Duration::from_secs(config.timeout_secs))
             .build()
-            .map_err(|e| MomoError::Embedding(format!("Failed to create HTTP client: {}", e)))?;
+            .map_err(|e| MomoError::Embedding(format!("Failed to create HTTP client: {e}")))?;
 
         Ok(Self { client, config })
     }
@@ -71,8 +71,8 @@ impl EmbeddingApiClient {
         if let Some(ref api_key) = self.config.api_key {
             headers.insert(
                 AUTHORIZATION,
-                HeaderValue::from_str(&format!("Bearer {}", api_key))
-                    .map_err(|e| MomoError::Embedding(format!("Invalid API key header: {}", e)))?,
+                HeaderValue::from_str(&format!("Bearer {api_key}"))
+                    .map_err(|e| MomoError::Embedding(format!("Invalid API key header: {e}")))?,
             );
         }
 
@@ -99,7 +99,7 @@ impl EmbeddingApiClient {
 
                     if status.is_success() {
                         let body: EmbeddingResponse = resp.json().await.map_err(|e| {
-                            MomoError::Embedding(format!("Failed to parse response: {}", e))
+                            MomoError::Embedding(format!("Failed to parse response: {e}"))
                         })?;
                         return Ok(body.data.into_iter().map(|d| d.embedding).collect());
                     }
@@ -124,20 +124,18 @@ impl EmbeddingApiClient {
                     if status.is_server_error() {
                         let body = resp.text().await.unwrap_or_default();
                         last_error = Some(MomoError::Embedding(format!(
-                            "Server error {}: {}",
-                            status, body
+                            "Server error {status}: {body}"
                         )));
                         continue;
                     }
 
                     let body = resp.text().await.unwrap_or_default();
                     return Err(MomoError::Embedding(format!(
-                        "API error {}: {}",
-                        status, body
+                        "API error {status}: {body}"
                     )));
                 }
                 Err(e) => {
-                    last_error = Some(MomoError::Embedding(format!("Request failed: {}", e)));
+                    last_error = Some(MomoError::Embedding(format!("Request failed: {e}")));
                     continue;
                 }
             }

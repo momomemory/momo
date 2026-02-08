@@ -36,7 +36,7 @@ impl TranscriptionProvider {
                     TranscriptionBackend::Local { whisper }
                 }
                 Err(e) => {
-                    let reason = format!("Whisper backend unavailable: {}", e);
+                    let reason = format!("Whisper backend unavailable: {e}");
                     warn!("{}", reason);
                     TranscriptionBackend::Unavailable { reason }
                 }
@@ -49,7 +49,7 @@ impl TranscriptionProvider {
                     TranscriptionBackend::Api { client }
                 }
                 Err(e) => {
-                    let reason = format!("Transcription API backend unavailable: {}", e);
+                    let reason = format!("Transcription API backend unavailable: {e}");
                     warn!("{}", reason);
                     TranscriptionBackend::Unavailable { reason }
                 }
@@ -60,15 +60,6 @@ impl TranscriptionProvider {
             backend,
             config: config.clone(),
         })
-    }
-
-    pub fn unavailable(reason: &str) -> Self {
-        Self {
-            backend: TranscriptionBackend::Unavailable {
-                reason: reason.to_string(),
-            },
-            config: TranscriptionConfig::default(),
-        }
     }
 
     pub fn is_available(&self) -> bool {
@@ -113,10 +104,6 @@ impl TranscriptionProvider {
             }
         }
     }
-
-    pub fn config(&self) -> &TranscriptionConfig {
-        &self.config
-    }
 }
 
 impl Clone for TranscriptionProvider {
@@ -157,7 +144,12 @@ mod tests {
 
     #[tokio::test]
     async fn test_transcription_unavailable_returns_error() {
-        let provider = TranscriptionProvider::unavailable("Test unavailable");
+        let config = TranscriptionConfig {
+            model: "openai/whisper-1".to_string(),
+            api_key: None,
+            ..TranscriptionConfig::default()
+        };
+        let provider = TranscriptionProvider::new(&config).unwrap();
         let result = provider.transcribe(&[]).await;
         assert!(matches!(
             result,
@@ -167,13 +159,23 @@ mod tests {
 
     #[test]
     fn test_transcription_provider_is_available() {
-        let provider = TranscriptionProvider::unavailable("test");
+        let config = TranscriptionConfig {
+            model: "openai/whisper-1".to_string(),
+            api_key: None,
+            ..TranscriptionConfig::default()
+        };
+        let provider = TranscriptionProvider::new(&config).unwrap();
         assert!(!provider.is_available());
     }
 
     #[test]
     fn test_transcription_provider_clone() {
-        let provider = TranscriptionProvider::unavailable("test");
+        let config = TranscriptionConfig {
+            model: "openai/whisper-1".to_string(),
+            api_key: None,
+            ..TranscriptionConfig::default()
+        };
+        let provider = TranscriptionProvider::new(&config).unwrap();
         let cloned = provider.clone();
         assert!(!cloned.is_available());
     }

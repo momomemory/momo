@@ -11,9 +11,6 @@ pub enum MomoError {
     #[error("Database error: {0}")]
     Database(#[from] libsql::Error),
 
-    #[error("Database backend error: {0}")]
-    DatabaseBackend(String),
-
     #[error("Not found: {0}")]
     NotFound(String),
 
@@ -38,29 +35,11 @@ pub enum MomoError {
     #[error("URL parse error: {0}")]
     UrlParse(#[from] url::ParseError),
 
-    #[error("Authentication required")]
-    Unauthorized,
-
-    #[error("Rate limit exceeded")]
-    RateLimited,
-
     #[error("API rate limit exceeded, retry after {retry_after:?} seconds")]
     ApiRateLimit { retry_after: Option<u64> },
 
     #[error("API authentication error: {0}")]
     ApiAuth(String),
-
-    #[error("Embedding dimension mismatch: database has {db_dimensions} dimensions, model produces {model_dimensions} dimensions")]
-    DimensionMismatch {
-        db_dimensions: usize,
-        model_dimensions: usize,
-    },
-
-    #[error("Migration required: database has {db_dimensions} dimensions, model produces {model_dimensions} dimensions")]
-    MigrationRequired {
-        db_dimensions: usize,
-        model_dimensions: usize,
-    },
 
     #[error("Internal server error: {0}")]
     Internal(String),
@@ -95,10 +74,7 @@ impl IntoResponse for MomoError {
         let (status, message) = match &self {
             MomoError::NotFound(msg) => (StatusCode::NOT_FOUND, msg.clone()),
             MomoError::Validation(msg) => (StatusCode::BAD_REQUEST, msg.clone()),
-            MomoError::Unauthorized => (StatusCode::UNAUTHORIZED, "Unauthorized".to_string()),
-            MomoError::RateLimited => (StatusCode::TOO_MANY_REQUESTS, "Rate limited".to_string()),
             MomoError::Database(e) => (StatusCode::INTERNAL_SERVER_ERROR, e.to_string()),
-            MomoError::DatabaseBackend(msg) => (StatusCode::INTERNAL_SERVER_ERROR, msg.clone()),
             MomoError::Embedding(msg) => (StatusCode::INTERNAL_SERVER_ERROR, msg.clone()),
             MomoError::Processing(msg) => (StatusCode::INTERNAL_SERVER_ERROR, msg.clone()),
             MomoError::Http(e) => (StatusCode::BAD_GATEWAY, e.to_string()),
@@ -107,12 +83,6 @@ impl IntoResponse for MomoError {
             MomoError::UrlParse(e) => (StatusCode::BAD_REQUEST, e.to_string()),
             MomoError::ApiRateLimit { .. } => (StatusCode::TOO_MANY_REQUESTS, self.to_string()),
             MomoError::ApiAuth(msg) => (StatusCode::UNAUTHORIZED, msg.clone()),
-            MomoError::DimensionMismatch { .. } => {
-                (StatusCode::INTERNAL_SERVER_ERROR, self.to_string())
-            }
-            MomoError::MigrationRequired { .. } => {
-                (StatusCode::SERVICE_UNAVAILABLE, self.to_string())
-            }
             MomoError::Internal(msg) => (StatusCode::INTERNAL_SERVER_ERROR, msg.clone()),
             MomoError::Ocr(msg) => (StatusCode::INTERNAL_SERVER_ERROR, msg.clone()),
             MomoError::OcrUnavailable(msg) => (StatusCode::SERVICE_UNAVAILABLE, msg.clone()),
@@ -124,10 +94,7 @@ impl IntoResponse for MomoError {
             MomoError::LlmUnavailable(msg) => (StatusCode::SERVICE_UNAVAILABLE, msg.clone()),
             MomoError::LlmRateLimit { retry_after } => (
                 StatusCode::TOO_MANY_REQUESTS,
-                format!(
-                    "LLM rate limit exceeded, retry after {:?} seconds",
-                    retry_after
-                ),
+                format!("LLM rate limit exceeded, retry after {retry_after:?} seconds"),
             ),
             MomoError::Reranker(msg) => (StatusCode::INTERNAL_SERVER_ERROR, msg.clone()),
         };

@@ -3,7 +3,7 @@ use momo::config::{Config, LlmConfig};
 use momo::db::{Database, DatabaseBackend, LibSqlBackend};
 use momo::embeddings::EmbeddingProvider;
 use momo::llm::LlmProvider;
-use momo::models::{SearchDocumentsResponse, SearchMemoriesResponse};
+use momo::models::SearchDocumentsResponse;
 use momo::ocr::OcrProvider;
 use momo::transcription::TranscriptionProvider;
 use serde_json::json;
@@ -83,11 +83,11 @@ async fn setup_test_app(llm_enabled: bool) -> (SocketAddr, TempDir) {
 async fn test_rewrite_disabled_by_default() {
     let (addr, _temp_dir) = setup_test_app(false).await;
     let client = reqwest::Client::new();
-    let base_url = format!("http://{}", addr);
+    let base_url = format!("http://{addr}");
 
     // Add a test document
     let doc_res = client
-        .post(format!("{}/v3/documents", base_url))
+        .post(format!("{base_url}/v3/documents"))
         .json(&json!({
             "content": "Rust is a systems programming language focused on safety and performance.",
             "container_tag": "test_tag",
@@ -103,7 +103,7 @@ async fn test_rewrite_disabled_by_default() {
 
     // Search without rewrite flag
     let search_res = client
-        .post(format!("{}/v3/search", base_url))
+        .post(format!("{base_url}/v3/search"))
         .json(&json!({
             "q": "rust programming",
             "container_tags": ["test_tag"]
@@ -126,11 +126,11 @@ async fn test_rewrite_disabled_by_default() {
 async fn test_rewrite_enabled_with_flag() {
     let (addr, _temp_dir) = setup_test_app(true).await;
     let client = reqwest::Client::new();
-    let base_url = format!("http://{}", addr);
+    let base_url = format!("http://{addr}");
 
     // Add test document
     let doc_res = client
-        .post(format!("{}/v3/documents", base_url))
+        .post(format!("{base_url}/v3/documents"))
         .json(&json!({
             "content": "Machine learning algorithms for image classification.",
             "container_tag": "ml_tag"
@@ -145,7 +145,7 @@ async fn test_rewrite_enabled_with_flag() {
 
     // Search with rewrite_query=true - will fail gracefully if LLM unavailable
     let search_res = client
-        .post(format!("{}/v3/search", base_url))
+        .post(format!("{base_url}/v3/search"))
         .json(&json!({
             "q": "how to train ML models",
             "container_tags": ["ml_tag"],
@@ -166,10 +166,10 @@ async fn test_rewrite_enabled_with_flag() {
 async fn test_rewrite_flag_false_skips_rewrite() {
     let (addr, _temp_dir) = setup_test_app(true).await;
     let client = reqwest::Client::new();
-    let base_url = format!("http://{}", addr);
+    let base_url = format!("http://{addr}");
 
     let doc_res = client
-        .post(format!("{}/v3/documents", base_url))
+        .post(format!("{base_url}/v3/documents"))
         .json(&json!({
             "content": "Deep learning neural networks and architectures.",
             "container_tag": "dl_tag"
@@ -184,7 +184,7 @@ async fn test_rewrite_flag_false_skips_rewrite() {
 
     // Explicitly set rewrite_query=false
     let search_res = client
-        .post(format!("{}/v3/search", base_url))
+        .post(format!("{base_url}/v3/search"))
         .json(&json!({
             "q": "neural network architectures",
             "container_tags": ["dl_tag"],
@@ -209,10 +209,10 @@ async fn test_llm_unavailable_graceful_fallback() {
     // Set up with LLM enabled but unreachable endpoint
     let (addr, _temp_dir) = setup_test_app(true).await;
     let client = reqwest::Client::new();
-    let base_url = format!("http://{}", addr);
+    let base_url = format!("http://{addr}");
 
     let doc_res = client
-        .post(format!("{}/v3/documents", base_url))
+        .post(format!("{base_url}/v3/documents"))
         .json(&json!({
             "content": "Natural language processing techniques for sentiment analysis.",
             "container_tag": "nlp_tag"
@@ -227,7 +227,7 @@ async fn test_llm_unavailable_graceful_fallback() {
 
     // Search with rewrite_query=true - should fallback gracefully
     let search_res = client
-        .post(format!("{}/v3/search", base_url))
+        .post(format!("{base_url}/v3/search"))
         .json(&json!({
             "q": "sentiment analysis methods",
             "container_tags": ["nlp_tag"],
@@ -254,10 +254,10 @@ async fn test_llm_unavailable_graceful_fallback() {
 async fn test_timeout_fallback() {
     let (addr, _temp_dir) = setup_test_app(true).await;
     let client = reqwest::Client::new();
-    let base_url = format!("http://{}", addr);
+    let base_url = format!("http://{addr}");
 
     let doc_res = client
-        .post(format!("{}/v3/documents", base_url))
+        .post(format!("{base_url}/v3/documents"))
         .json(&json!({
             "content": "Computer vision object detection models.",
             "container_tag": "cv_tag"
@@ -272,7 +272,7 @@ async fn test_timeout_fallback() {
 
     // Request with rewrite - will timeout if LLM is slow/unavailable
     let search_res = client
-        .post(format!("{}/v3/search", base_url))
+        .post(format!("{base_url}/v3/search"))
         .json(&json!({
             "q": "object detection algorithms",
             "container_tags": ["cv_tag"],
@@ -297,10 +297,10 @@ async fn test_timeout_fallback() {
 async fn test_short_query_skipped() {
     let (addr, _temp_dir) = setup_test_app(true).await;
     let client = reqwest::Client::new();
-    let base_url = format!("http://{}", addr);
+    let base_url = format!("http://{addr}");
 
     let doc_res = client
-        .post(format!("{}/v3/documents", base_url))
+        .post(format!("{base_url}/v3/documents"))
         .json(&json!({
             "content": "Kubernetes container orchestration platform.",
             "container_tag": "k8s_tag"
@@ -315,7 +315,7 @@ async fn test_short_query_skipped() {
 
     // Very short query (< 3 chars) should be skipped
     let search_res = client
-        .post(format!("{}/v3/search", base_url))
+        .post(format!("{base_url}/v3/search"))
         .json(&json!({
             "q": "k8",
             "container_tags": ["k8s_tag"],
@@ -339,10 +339,10 @@ async fn test_short_query_skipped() {
 async fn test_long_query_skipped() {
     let (addr, _temp_dir) = setup_test_app(true).await;
     let client = reqwest::Client::new();
-    let base_url = format!("http://{}", addr);
+    let base_url = format!("http://{addr}");
 
     let doc_res = client
-        .post(format!("{}/v3/documents", base_url))
+        .post(format!("{base_url}/v3/documents"))
         .json(&json!({
             "content": "Distributed systems consensus algorithms.",
             "container_tag": "dist_tag"
@@ -358,7 +358,7 @@ async fn test_long_query_skipped() {
     // Very long query (> 500 chars) should be skipped
     let long_query = "a".repeat(501);
     let search_res = client
-        .post(format!("{}/v3/search", base_url))
+        .post(format!("{base_url}/v3/search"))
         .json(&json!({
             "q": long_query,
             "container_tags": ["dist_tag"],
@@ -382,11 +382,11 @@ async fn test_long_query_skipped() {
 async fn test_memory_search_rewrite() {
     let (addr, _temp_dir) = setup_test_app(false).await;
     let client = reqwest::Client::new();
-    let base_url = format!("http://{}", addr);
+    let base_url = format!("http://{addr}");
 
     // Create a memory via documents
     let doc_res = client
-        .post(format!("{}/v3/documents", base_url))
+        .post(format!("{base_url}/v3/documents"))
         .json(&json!({
             "content": "User prefers dark mode interface with blue accent colors.",
             "container_tag": "user_prefs"
@@ -401,7 +401,7 @@ async fn test_memory_search_rewrite() {
 
     // Search memories without rewrite
     let search_res = client
-        .post(format!("{}/v4/search", base_url))
+        .post(format!("{base_url}/v4/search"))
         .json(&json!({
             "q": "interface preferences",
             "container_tag": "user_prefs"

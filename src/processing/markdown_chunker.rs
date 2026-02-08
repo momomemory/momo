@@ -41,9 +41,8 @@ impl ContentChunker for MarkdownChunker {
         chunks
             .iter()
             .enumerate()
-            .map(|(i, chunk_text)| TextChunk {
+            .map(|(_, chunk_text)| TextChunk {
                 content: chunk_text.to_string(),
-                position: i,
                 token_count: (chunk_text.len() as f32 / 4.0).ceil() as i32,
             })
             .collect()
@@ -63,7 +62,6 @@ impl Default for MarkdownChunker {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::models::DocumentType;
 
     #[test]
     fn test_markdown_chunker_basic() {
@@ -103,7 +101,6 @@ mod tests {
         let chunker = MarkdownChunker::default();
         let context = ChunkContext {
             source_path: Some("README.md".to_string()),
-            doc_type: Some(DocumentType::Markdown),
         };
         let chunks = chunker.chunk("# Test\n\nContent", Some(&context));
         assert!(!chunks.is_empty());
@@ -130,7 +127,7 @@ mod tests {
 
         // Create a large markdown document with multiple sections
         for i in 0..20 {
-            md.push_str(&format!("# Section {}\n\n", i));
+            md.push_str(&format!("# Section {i}\n\n"));
             md.push_str("This is some content for this section. ");
             md.push_str("It contains multiple sentences to make it longer. ");
             md.push_str("We want to ensure the chunker handles larger documents.\n\n");

@@ -8,6 +8,7 @@ use super::{
 
 /// Registry that routes documents to appropriate chunkers based on DocumentType.
 /// Stores owned chunker instances and returns trait object references for dispatch.
+#[derive(Default)]
 pub struct ChunkerRegistry {
     text_chunker: TextChunker,
     code_chunker: CodeChunker,
@@ -70,17 +71,6 @@ impl ChunkerRegistry {
     }
 }
 
-impl Default for ChunkerRegistry {
-    fn default() -> Self {
-        Self {
-            text_chunker: TextChunker::default(),
-            code_chunker: CodeChunker::default(),
-            markdown_chunker: MarkdownChunker::default(),
-            webpage_chunker: WebpageChunker::default(),
-            structured_data_chunker: StructuredDataChunker::default(),
-        }
-    }
-}
 
 #[cfg(test)]
 mod tests {

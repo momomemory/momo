@@ -68,10 +68,10 @@ async fn setup_test_app(reranker_override: Option<RerankerProvider>) -> (SocketA
 async fn test_search_rerank_disabled_but_requested() {
     let (addr, _temp_dir) = setup_test_app(None).await;
     let client = reqwest::Client::new();
-    let base_url = format!("http://{}", addr);
+    let base_url = format!("http://{addr}");
 
     let doc_res = client
-        .post(format!("{}/v3/documents", base_url))
+        .post(format!("{base_url}/v3/documents"))
         .json(&json!({
             "content": "Rust is a systems programming language focused on safety and performance.",
             "container_tag": "test_tag",
@@ -84,7 +84,7 @@ async fn test_search_rerank_disabled_but_requested() {
     assert!(doc_res.status().is_success());
 
     let search_res = client
-        .post(format!("{}/v3/search", base_url))
+        .post(format!("{base_url}/v3/search"))
         .json(&json!({
             "q": "rust programming",
             "rerank": true,
@@ -108,9 +108,9 @@ async fn test_search_rerank_disabled_but_requested() {
 async fn test_search_rerank_false_backward_compatibility() {
     let (addr, _temp_dir) = setup_test_app(None).await;
     let client = reqwest::Client::new();
-    let base_url = format!("http://{}", addr);
+    let base_url = format!("http://{addr}");
 
-    client.post(format!("{}/v3/documents", base_url))
+    client.post(format!("{base_url}/v3/documents"))
         .json(&json!({
             "content": "Python is an interpreted, high-level, general-purpose programming language.",
             "container_tag": "test_tag"
@@ -122,7 +122,7 @@ async fn test_search_rerank_false_backward_compatibility() {
         .is_success();
 
     let search_res = client
-        .post(format!("{}/v3/search", base_url))
+        .post(format!("{base_url}/v3/search"))
         .json(&json!({
             "q": "python language",
             "rerank": false,
@@ -159,10 +159,10 @@ async fn test_search_rerank_with_mock() {
 
     let (addr, _temp_dir) = setup_test_app(Some(reranker)).await;
     let client = reqwest::Client::new();
-    let base_url = format!("http://{}", addr);
+    let base_url = format!("http://{addr}");
 
     client
-        .post(format!("{}/v3/documents", base_url))
+        .post(format!("{base_url}/v3/documents"))
         .json(&json!({
             "content": "First document about Rust.",
             "container_tag": "test_tag"
@@ -172,7 +172,7 @@ async fn test_search_rerank_with_mock() {
         .expect("Failed to add doc 1");
 
     client
-        .post(format!("{}/v3/documents", base_url))
+        .post(format!("{base_url}/v3/documents"))
         .json(&json!({
             "content": "Second document about Python.",
             "container_tag": "test_tag"
@@ -184,7 +184,7 @@ async fn test_search_rerank_with_mock() {
     tokio::time::sleep(tokio::time::Duration::from_millis(1000)).await;
 
     let search_res = client
-        .post(format!("{}/v3/search", base_url))
+        .post(format!("{base_url}/v3/search"))
         .json(&json!({
             "q": "programming",
             "rerank": true,
@@ -219,10 +219,10 @@ async fn test_search_rerank_chunk_level() {
 
     let (addr, _temp_dir) = setup_test_app(Some(reranker)).await;
     let client = reqwest::Client::new();
-    let base_url = format!("http://{}", addr);
+    let base_url = format!("http://{addr}");
 
     client
-        .post(format!("{}/v3/documents", base_url))
+        .post(format!("{base_url}/v3/documents"))
         .json(&json!({
             "content": "This is a document for chunk level reranking test.",
             "container_tag": "test_tag"
@@ -234,7 +234,7 @@ async fn test_search_rerank_chunk_level() {
     tokio::time::sleep(tokio::time::Duration::from_millis(1000)).await;
 
     let search_res = client
-        .post(format!("{}/v3/search", base_url))
+        .post(format!("{base_url}/v3/search"))
         .json(&json!({
             "q": "chunk test",
             "rerank": true,
@@ -268,10 +268,10 @@ async fn test_search_rerank_top_k() {
 
     let (addr, _temp_dir) = setup_test_app(Some(reranker)).await;
     let client = reqwest::Client::new();
-    let base_url = format!("http://{}", addr);
+    let base_url = format!("http://{addr}");
 
     client
-        .post(format!("{}/v3/documents", base_url))
+        .post(format!("{base_url}/v3/documents"))
         .json(&json!({
             "content": "Document 1",
             "container_tag": "test_tag"
@@ -281,7 +281,7 @@ async fn test_search_rerank_top_k() {
         .expect("Failed to add doc 1");
 
     client
-        .post(format!("{}/v3/documents", base_url))
+        .post(format!("{base_url}/v3/documents"))
         .json(&json!({
             "content": "Document 2",
             "container_tag": "test_tag"
@@ -293,7 +293,7 @@ async fn test_search_rerank_top_k() {
     tokio::time::sleep(tokio::time::Duration::from_millis(1000)).await;
 
     let search_res = client
-        .post(format!("{}/v3/search", base_url))
+        .post(format!("{base_url}/v3/search"))
         .json(&json!({
             "q": "document",
             "rerank": true,
@@ -326,10 +326,10 @@ async fn test_memory_search_rerank_mock() {
 
     let (addr, _temp_dir) = setup_test_app(Some(reranker)).await;
     let client = reqwest::Client::new();
-    let base_url = format!("http://{}", addr);
+    let base_url = format!("http://{addr}");
 
     let search_res = client
-        .post(format!("{}/v4/search", base_url))
+        .post(format!("{base_url}/v4/search"))
         .json(&json!({
             "q": "something",
             "rerank": true,

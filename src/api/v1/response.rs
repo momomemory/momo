@@ -271,7 +271,7 @@ impl<T: Serialize> From<MomoError> for ApiResponse<T> {
                 ApiResponse::error(ErrorCode::InvalidRequest, msg.clone())
             }
 
-            MomoError::Unauthorized | MomoError::ApiAuth(_) => {
+            MomoError::ApiAuth(_) => {
                 ApiResponse::error(ErrorCode::Unauthorized, "Authentication required")
             }
 
@@ -281,10 +281,6 @@ impl<T: Serialize> From<MomoError> for ApiResponse<T> {
 
             MomoError::UrlParse(ref e) => {
                 ApiResponse::error(ErrorCode::InvalidRequest, format!("Invalid URL: {e}"))
-            }
-
-            MomoError::RateLimited => {
-                ApiResponse::error(ErrorCode::InvalidRequest, "Rate limit exceeded")
             }
 
             MomoError::ApiRateLimit { retry_after } => {
@@ -316,7 +312,6 @@ impl<T: Serialize> From<MomoError> for ApiResponse<T> {
             }
 
             ref internal @ (MomoError::Database(_)
-            | MomoError::DatabaseBackend(_)
             | MomoError::Processing(_)
             | MomoError::Embedding(_)
             | MomoError::Http(_)
@@ -325,9 +320,7 @@ impl<T: Serialize> From<MomoError> for ApiResponse<T> {
             | MomoError::Ocr(_)
             | MomoError::Transcription(_)
             | MomoError::Llm(_)
-            | MomoError::Reranker(_)
-            | MomoError::DimensionMismatch { .. }
-            | MomoError::MigrationRequired { .. }) => {
+            | MomoError::Reranker(_)) => {
                 tracing::error!(error = %internal, "Internal error mapped to v1 response");
                 ApiResponse::error(ErrorCode::InternalError, "An internal error occurred")
             }
@@ -472,15 +465,6 @@ mod tests {
     }
 
     #[test]
-    fn momo_error_unauthorized_maps() {
-        let resp: ApiResponse<()> = MomoError::Unauthorized.into();
-        assert_eq!(
-            resp.error.as_ref().expect("error").code,
-            ErrorCode::Unauthorized
-        );
-    }
-
-    #[test]
     fn momo_error_unavailable_maps_to_not_implemented() {
         let resp: ApiResponse<()> = MomoError::LlmUnavailable("no LLM".into()).into();
         assert_eq!(
@@ -491,12 +475,6 @@ mod tests {
 
     #[test]
     fn momo_error_rate_limit_maps_to_invalid_request() {
-        let resp: ApiResponse<()> = MomoError::RateLimited.into();
-        assert_eq!(
-            resp.error.as_ref().expect("error").code,
-            ErrorCode::InvalidRequest
-        );
-
         let resp: ApiResponse<()> = MomoError::ApiRateLimit {
             retry_after: Some(30),
         }

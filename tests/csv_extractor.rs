@@ -1,6 +1,5 @@
 use momo::models::DocumentType;
 use momo::processing::extractors::csv::CsvExtractor;
-use momo::processing::extractors::ExtractedContent;
 
 mod common;
 use common::ensure_fixtures;

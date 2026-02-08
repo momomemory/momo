@@ -1,13 +1,11 @@
 use unicode_segmentation::UnicodeSegmentation;
 
 use crate::config::ProcessingConfig;
-use crate::models::DocumentType;
 
 /// Context passed to chunkers for source file information
 #[derive(Debug, Clone, Default)]
 pub struct ChunkContext {
     pub source_path: Option<String>,
-    pub doc_type: Option<DocumentType>,
 }
 
 /// Trait for content chunking implementations
@@ -84,7 +82,7 @@ impl TextChunker {
                 "Inc.", "Ltd.", "Corp.", "Co.", "No.", "Vol.", "Ch.", "Fig.", "Eq.", "Sec.",
             ];
 
-            if abbreviations.iter().any(|&abbr| *last_word == abbr) {
+            if abbreviations.contains(last_word) {
                 return false;
             }
         }
@@ -111,7 +109,6 @@ impl TextChunker {
             if potential_length > self.chunk_size && !current_chunk.is_empty() {
                 chunks.push(TextChunk {
                     content: current_chunk.clone(),
-                    position: chunks.len(),
                     token_count: Self::estimate_tokens(&current_chunk),
                 });
 
@@ -130,7 +127,6 @@ impl TextChunker {
         if !current_chunk.is_empty() {
             chunks.push(TextChunk {
                 content: current_chunk.clone(),
-                position: chunks.len(),
                 token_count: Self::estimate_tokens(&current_chunk),
             });
         }
@@ -185,18 +181,7 @@ impl Default for TextChunker {
 #[derive(Debug, Clone)]
 pub struct TextChunk {
     pub content: String,
-    pub position: usize,
     pub token_count: i32,
-}
-
-/// Metadata-rich chunk for semantic content
-#[derive(Debug, Clone)]
-pub struct SemanticChunk {
-    pub content: String,
-    pub position: usize,
-    pub token_count: i32,
-    pub headers: Vec<String>,
-    pub heading_level: Option<u8>,
 }
 
 #[cfg(test)]
@@ -207,10 +192,7 @@ mod tests {
     fn test_text_chunker_basic() {
         let chunker = TextChunker::default();
         let text = "First sentence. Second sentence. Third sentence.";
-        let context = ChunkContext {
-            source_path: None,
-            doc_type: None,
-        };
+        let context = ChunkContext { source_path: None };
 
         let chunks = chunker.chunk(text, Some(&context));
 
@@ -256,7 +238,6 @@ mod tests {
             text,
             Some(&ChunkContext {
                 source_path: Some("test.txt".into()),
-                doc_type: None,
             }),
         );
         let chunks_without = chunker.chunk(text, None);
@@ -269,45 +250,10 @@ mod tests {
     }
 
     #[test]
-    fn test_chunk_context_with_doc_type() {
+    fn test_chunk_context_creation() {
         let context = ChunkContext {
             source_path: Some("test.md".to_string()),
-            doc_type: Some(DocumentType::Markdown),
         };
-        assert_eq!(context.doc_type, Some(DocumentType::Markdown));
-    }
-
-    #[test]
-    fn test_chunk_context_backward_compat() {
-        let context = ChunkContext {
-            source_path: None,
-            doc_type: None,
-        };
-        assert!(context.doc_type.is_none());
-    }
-
-    #[test]
-    fn test_semantic_chunk_creation() {
-        let chunk = SemanticChunk {
-            content: "Test content".to_string(),
-            position: 0,
-            token_count: 3,
-            headers: vec!["# Main Header".to_string(), "## Subsection".to_string()],
-            heading_level: Some(2),
-        };
-        assert_eq!(chunk.headers.len(), 2);
-        assert_eq!(chunk.heading_level, Some(2));
-    }
-
-    #[test]
-    fn test_semantic_chunk_no_headers() {
-        let chunk = SemanticChunk {
-            content: "Plain text".to_string(),
-            position: 0,
-            token_count: 2,
-            headers: vec![],
-            heading_level: None,
-        };
-        assert!(chunk.headers.is_empty());
+        assert_eq!(context.source_path, Some("test.md".to_string()));
     }
 }

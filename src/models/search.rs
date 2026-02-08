@@ -28,8 +28,7 @@ impl<'de> Deserialize<'de> for SearchMode {
             "documents" => Ok(SearchMode::Documents),
             "memories" => Ok(SearchMode::Memories),
             _ => Err(de::Error::custom(format!(
-                "Invalid searchMode '{}'. Valid modes: hybrid, documents, memories",
-                raw
+                "Invalid searchMode '{raw}'. Valid modes: hybrid, documents, memories"
             ))),
         }
     }
@@ -160,9 +159,9 @@ mod tests {
         let documents = SearchMode::Documents;
         let memories = SearchMode::Memories;
 
-        assert_eq!(to_value(&hybrid).unwrap(), json!("hybrid"));
-        assert_eq!(to_value(&documents).unwrap(), json!("documents"));
-        assert_eq!(to_value(&memories).unwrap(), json!("memories"));
+        assert_eq!(to_value(hybrid).unwrap(), json!("hybrid"));
+        assert_eq!(to_value(documents).unwrap(), json!("documents"));
+        assert_eq!(to_value(memories).unwrap(), json!("memories"));
     }
 
     #[test]
@@ -252,14 +251,12 @@ mod tests {
         let score = v.get("score").unwrap().as_f64().unwrap();
         assert!(
             (score - 0.85).abs() < 0.001,
-            "score should be approximately 0.85, got {}",
-            score
+            "score should be approximately 0.85, got {score}"
         );
         let rerank_score = v.get("rerank_score").unwrap().as_f64().unwrap();
         assert!(
             (rerank_score - 0.92).abs() < 0.001,
-            "rerank_score should be approximately 0.92, got {}",
-            rerank_score
+            "rerank_score should be approximately 0.92, got {rerank_score}"
         );
     }
 
@@ -283,8 +280,7 @@ mod tests {
         let score = v.get("score").unwrap().as_f64().unwrap();
         assert!(
             (score - 0.75).abs() < 0.001,
-            "score should be approximately 0.75, got {}",
-            score
+            "score should be approximately 0.75, got {score}"
         );
         assert!(v.get("rerank_score").is_none());
     }
@@ -308,14 +304,12 @@ mod tests {
         let similarity = v.get("similarity").unwrap().as_f64().unwrap();
         assert!(
             (similarity - 0.88).abs() < 0.001,
-            "similarity should be approximately 0.88, got {}",
-            similarity
+            "similarity should be approximately 0.88, got {similarity}"
         );
         let rerank_score = v.get("rerank_score").unwrap().as_f64().unwrap();
         assert!(
             (rerank_score - 0.95).abs() < 0.001,
-            "rerank_score should be approximately 0.95, got {}",
-            rerank_score
+            "rerank_score should be approximately 0.95, got {rerank_score}"
         );
     }
 
@@ -338,8 +332,7 @@ mod tests {
         let similarity = v.get("similarity").unwrap().as_f64().unwrap();
         assert!(
             (similarity - 0.72).abs() < 0.001,
-            "similarity should be approximately 0.72, got {}",
-            similarity
+            "similarity should be approximately 0.72, got {similarity}"
         );
         assert!(v.get("rerank_score").is_none());
     }

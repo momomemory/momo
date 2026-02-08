@@ -9,11 +9,6 @@ use crate::config::{parse_llm_provider_model, LlmConfig};
 use crate::error::{MomoError, Result};
 use crate::llm::api::LlmApiClient;
 
-const OPENAI_BASE_URL: &str = "https://api.openai.com/v1";
-const OPENROUTER_BASE_URL: &str = "https://openrouter.ai/api/v1";
-const OLLAMA_BASE_URL: &str = "http://localhost:11434/v1";
-const LMSTUDIO_BASE_URL: &str = "http://localhost:1234/v1";
-
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum LlmBackend {
     OpenAI,
@@ -91,27 +86,6 @@ impl LlmProvider {
         self.config.as_deref()
     }
 
-    pub fn model_name(&self) -> Option<&str> {
-        self.config().map(|config| config.model.as_str())
-    }
-
-    pub fn base_url(&self) -> Option<&str> {
-        if let Some(config) = self.config() {
-            if let Some(base_url) = config.base_url.as_deref() {
-                return Some(base_url);
-            }
-        }
-
-        match &self.backend {
-            LlmBackend::OpenAI => Some(OPENAI_BASE_URL),
-            LlmBackend::OpenRouter => Some(OPENROUTER_BASE_URL),
-            LlmBackend::Ollama => Some(OLLAMA_BASE_URL),
-            LlmBackend::LmStudio => Some(LMSTUDIO_BASE_URL),
-            LlmBackend::OpenAICompatible { base_url } => Some(base_url),
-            LlmBackend::Unavailable { .. } => None,
-        }
-    }
-
     pub async fn complete(
         &self,
         prompt: &str,
@@ -150,37 +124,7 @@ impl LlmProvider {
         let json_value = self.complete_json(prompt, None).await?;
 
         serde_json::from_value(json_value)
-            .map_err(|e| MomoError::Llm(format!("Failed to deserialize response: {}", e)))
-    }
-
-    pub fn complete_stream(
-        &self,
-        prompt: &str,
-    ) -> Pin<Box<dyn Stream<Item = Result<String>> + Send + 'static>> {
-        if !self.is_available() {
-            let reason = self.unavailable_reason();
-            return Box::pin(stream::once(async move {
-                Err(MomoError::LlmUnavailable(reason))
-            }));
-        }
-
-        let config = match self.config() {
-            Some(cfg) => cfg.clone(),
-            None => {
-                return Box::pin(stream::once(async {
-                    Err(MomoError::LlmUnavailable("No config available".to_string()))
-                }));
-            }
-        };
-
-        let client = match LlmApiClient::new(&config) {
-            Ok(c) => c,
-            Err(e) => {
-                return Box::pin(stream::once(async move { Err(e) }));
-            }
-        };
-
-        client.complete_stream(prompt)
+            .map_err(|e| MomoError::Llm(format!("Failed to deserialize response: {e}")))
     }
 
     fn unavailable_reason(&self) -> String {

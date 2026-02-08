@@ -34,15 +34,14 @@ Memory Types:
 Confidence: A score from 0.0 to 1.0 indicating how certain you are about this memory.
 
 Content:
-{}
+{content}
 
 Respond with valid JSON only. Example format:
 [
   {{"content": "User prefers dark mode", "memory_type": "preference", "confidence": 0.9}},
   {{"content": "User is a software engineer", "memory_type": "fact", "confidence": 0.85}},
   {{"content": "User attended a conference last week", "memory_type": "episode", "confidence": 0.8}}
-]"#,
-        content
+]"#
     )
 }
 
@@ -92,15 +91,14 @@ Memory Types:
 Confidence: A score from 0.0 to 1.0 indicating how certain you are about this memory.
 
 Conversation:
-{}
+{conversation}
 
 Respond with valid JSON only. Example format:
 [
   {{"content": "User prefers dark mode", "memory_type": "preference", "confidence": 0.9}},
   {{"content": "User is a software engineer", "memory_type": "fact", "confidence": 0.85}},
   {{"content": "User attended a conference last week", "memory_type": "episode", "confidence": 0.8}}
-]"#,
-        conversation
+]"#
     )
 }
 
@@ -127,10 +125,9 @@ pub fn query_rewrite_prompt(query: &str) -> String {
         r#"Rewrite the following search query to improve semantic search results.
 Expand abbreviations, add context, and make the query more specific.
 
-Original query: {}
+Original query: {query}
 
-Respond with only the rewritten query, no explanation."#,
-        query
+Respond with only the rewritten query, no explanation."#
     )
 }
 
@@ -155,14 +152,13 @@ Respond with only the rewritten query, no explanation."#,
 /// ```
 pub fn summarize_prompt(content: &str, max_length: usize) -> String {
     format!(
-        r#"Summarize the following content in {} words or less.
+        r#"Summarize the following content in {max_length} words or less.
 Focus on the key points and main ideas.
 
 Content:
-{}
+{content}
 
-Respond with only the summary, no preamble."#,
-        max_length, content
+Respond with only the summary, no preamble."#
     )
 }
 
@@ -199,7 +195,7 @@ pub fn relationship_detection_prompt(
 ) -> String {
     let candidate_list = candidates
         .iter()
-        .map(|(id, content)| format!("[ID: {}] {}", id, content))
+        .map(|(id, content)| format!("[ID: {id}] {content}"))
         .collect::<Vec<_>>()
         .join("\n");
 
@@ -276,7 +272,7 @@ Example format:
 pub fn inference_generation_prompt(seed_memory: &str, related_memories: &[(&str, &str)]) -> String {
     let related_list = related_memories
         .iter()
-        .map(|(id, content)| format!("[ID: {}] {}", id, content))
+        .map(|(id, content)| format!("[ID: {id}] {content}"))
         .collect::<Vec<_>>()
         .join("\n");
 
@@ -291,10 +287,10 @@ Output MUST be valid JSON with the following fields:
 - source_ids: an array of source memory IDs that support the synthesized insight (array of strings)
 
 Seed Memory:
-{}
+{seed_memory}
 
 Related Memories:
-{}
+{related_list}
 
 Respond with valid JSON only. Example format:
 {{
@@ -303,8 +299,7 @@ Respond with valid JSON only. Example format:
   "confidence": 0.87,
   "source_ids": ["mem_1", "mem_2"]
 }}
-"#,
-        seed_memory, related_list
+"#
     )
 }
 
@@ -321,7 +316,7 @@ Respond with valid JSON only. Example format:
 pub fn narrative_generation_prompt(memories: &[&str]) -> String {
     let memory_list = memories
         .iter()
-        .map(|m| format!("- {}", m))
+        .map(|m| format!("- {m}"))
         .collect::<Vec<_>>()
         .join("\n");
 
@@ -334,14 +329,13 @@ The narrative must be factual, concise, and objective.
 4. If memories contradict, note the conflict objectively.
 
 Memories:
-{}
+{memory_list}
 
 Respond with valid JSON only. The JSON must contain a single field "narrative" with the generated text.
 Example:
 {{
   "narrative": "The user is a software engineer born in 1990. They prefer dark mode interfaces and listen to jazz music."
-}}"#,
-        memory_list
+}}"#
     )
 }
 
@@ -358,7 +352,7 @@ Example:
 pub fn fact_compaction_prompt(facts: &[&str]) -> String {
     let fact_list = facts
         .iter()
-        .map(|f| format!("- {}", f))
+        .map(|f| format!("- {f}"))
         .collect::<Vec<_>>()
         .join("\n");
 
@@ -369,15 +363,14 @@ pub fn fact_compaction_prompt(facts: &[&str]) -> String {
 3. Group them into logical categories (e.g., "Professional", "Personal", "Preferences", "Technical").
 
 Facts:
-{}
+{fact_list}
 
 Respond with valid JSON only. The output must be a key-value map where keys are category names and values are arrays of concise fact strings.
 Example:
 {{
   "Professional": ["Software Engineer at Tech Corp", "Specializes in Rust"],
   "Preferences": ["Likes dark mode", "Drinks coffee"]
-}}"#,
-        fact_list
+}}"#
     )
 }
 
@@ -412,10 +405,10 @@ pub fn llm_filter_prompt(content: &str, filter_prompt: &str) -> String {
         r#"Evaluate whether the following content should be included or skipped based on the filtering criteria.
 
 Filtering Criteria:
-{}
+{criteria}
 
 Content:
-{}
+{content}
 
 Respond with valid JSON only. Your response must contain exactly two fields:
 - "decision": Must be either "include" or "skip" (lowercase, no other values allowed)
@@ -427,8 +420,7 @@ Example format:
   "reasoning": "Content matches the technical documentation criteria"
 }}
 
-Return valid JSON only."#,
-        criteria, content
+Return valid JSON only."#
     )
 }
 

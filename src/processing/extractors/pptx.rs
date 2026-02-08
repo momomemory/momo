@@ -16,7 +16,7 @@ impl PptxExtractor {
     pub fn extract(bytes: &[u8]) -> Result<ExtractedContent> {
         let cursor = Cursor::new(bytes);
         let mut archive = ZipArchive::new(cursor)
-            .map_err(|e| MomoError::Processing(format!("PPTX parse error: {}", e)))?;
+            .map_err(|e| MomoError::Processing(format!("PPTX parse error: {e}")))?;
 
         let slide_order = Self::get_slide_order(&mut archive)?;
 
@@ -41,7 +41,7 @@ impl PptxExtractor {
 
             let slide_filename = match slide_mapping.get(r_id) {
                 Some(filename) => filename.clone(),
-                None => format!("ppt/slides/slide{}.xml", slide_number),
+                None => format!("ppt/slides/slide{slide_number}.xml"),
             };
 
             let slide_text = Self::extract_slide_content(&mut archive, &slide_filename)?;
@@ -49,7 +49,7 @@ impl PptxExtractor {
             if !text.is_empty() {
                 text.push_str("\n\n");
             }
-            text.push_str(&format!("## Slide {}\n\n", slide_number));
+            text.push_str(&format!("## Slide {slide_number}\n\n"));
 
             if !slide_text.is_empty() {
                 text.push_str(&slide_text);
@@ -103,8 +103,7 @@ impl PptxExtractor {
                 Ok(Event::Eof) => break,
                 Err(e) => {
                     return Err(MomoError::Processing(format!(
-                        "Error parsing presentation.xml: {}",
-                        e
+                        "Error parsing presentation.xml: {e}"
                     )))
                 }
                 _ => {}
@@ -153,7 +152,7 @@ impl PptxExtractor {
 
                         if let (Some(id), Some(target), Some(rel_type)) = (id, target, rel_type) {
                             if rel_type.contains("slide") && !rel_type.contains("slideLayout") {
-                                let full_path = format!("ppt/{}", target);
+                                let full_path = format!("ppt/{target}");
                                 mapping.insert(id, full_path);
                             }
                         }
@@ -185,7 +184,7 @@ impl PptxExtractor {
         archive: &mut ZipArchive<Cursor<&[u8]>>,
         slide_number: usize,
     ) -> Result<Option<String>> {
-        let notes_path = format!("ppt/notesSlides/notesSlide{}.xml", slide_number);
+        let notes_path = format!("ppt/notesSlides/notesSlide{slide_number}.xml");
 
         let xml = match Self::read_file_from_archive(archive, &notes_path) {
             Ok(content) => content,
@@ -263,12 +262,12 @@ impl PptxExtractor {
         path: &str,
     ) -> Result<String> {
         let mut file = archive.by_name(path).map_err(|e| {
-            MomoError::Processing(format!("Failed to read {} from PPTX: {}", path, e))
+            MomoError::Processing(format!("Failed to read {path} from PPTX: {e}"))
         })?;
 
         let mut content = String::new();
         file.read_to_string(&mut content).map_err(|e| {
-            MomoError::Processing(format!("Failed to read {} content: {}", path, e))
+            MomoError::Processing(format!("Failed to read {path} content: {e}"))
         })?;
 
         Ok(content)

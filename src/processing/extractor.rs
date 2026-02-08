@@ -148,7 +148,7 @@ impl ContentExtractor {
                             doc_type: DocumentType::Code,
                             url: Some(url_str.to_string()),
                             word_count,
-                            source_path: source_path,
+                            source_path,
                         });
                     }
                 }
@@ -193,7 +193,7 @@ impl ContentExtractor {
 
     pub fn extract_from_pdf(&self, bytes: &[u8], url: Option<&str>) -> Result<ExtractedContent> {
         let text = pdf_extract::extract_text_from_mem(bytes)
-            .map_err(|e| MomoError::Processing(format!("PDF extraction failed: {}", e)))?;
+            .map_err(|e| MomoError::Processing(format!("PDF extraction failed: {e}")))?;
 
         let word_count = Self::count_words(&text);
 
@@ -202,90 +202,6 @@ impl ContentExtractor {
             title: None,
             doc_type: DocumentType::Pdf,
             url: url.map(String::from),
-            word_count,
-            source_path: None,
-        })
-    }
-
-    /// Heuristic: text < 10 chars indicates scanned/image-based PDF.
-    pub fn is_scanned_pdf(text: &str, _bytes: &[u8]) -> bool {
-        text.trim().len() < 10
-    }
-
-    /// Extract PDF with optional OCR fallback for scanned documents.
-    pub async fn extract_from_pdf_with_ocr(
-        &self,
-        bytes: &[u8],
-        url: Option<&str>,
-        ocr_provider: Option<&OcrProvider>,
-        ocr_config: Option<&OcrConfig>,
-    ) -> Result<ExtractedContent> {
-        let text = pdf_extract::extract_text_from_mem(bytes)
-            .map_err(|e| MomoError::Processing(format!("PDF extraction failed: {}", e)))?;
-
-        if Self::is_scanned_pdf(&text, bytes) {
-            if let (Some(provider), Some(_config)) = (ocr_provider, ocr_config) {
-                if provider.is_available() {
-                    return Err(MomoError::Processing(
-                        "Scanned PDF detected but PDF-to-image conversion is not yet implemented. \
-                         Install a PDF renderer or use a pre-converted image.".to_string(),
-                    ));
-                } else {
-                    return Err(MomoError::Processing(
-                        "Scanned PDF detected but OCR provider is unavailable".to_string(),
-                    ));
-                }
-            } else {
-                tracing::debug!(
-                    url = ?url,
-                    extracted_text_len = text.len(),
-                    "Scanned PDF detected but no OCR provider configured"
-                );
-            }
-        }
-
-        let word_count = Self::count_words(&text);
-
-        Ok(ExtractedContent {
-            text,
-            title: None,
-            doc_type: DocumentType::Pdf,
-            url: url.map(String::from),
-            word_count,
-            source_path: None,
-        })
-    }
-
-    pub fn extract_from_markdown(&self, markdown: &str) -> Result<ExtractedContent> {
-        use pulldown_cmark::{Event, Parser, Tag, TagEnd};
-
-        let parser = Parser::new(markdown);
-        let mut text = String::new();
-        let mut title = None;
-
-        for event in parser {
-            match event {
-                Event::Text(t) => text.push_str(&t),
-                Event::SoftBreak | Event::HardBreak => text.push(' '),
-                Event::Start(Tag::Heading { level, .. }) if level as u8 == 1 && title.is_none() => {
-                }
-                Event::End(TagEnd::Heading(level)) if level as u8 == 1 && title.is_none() => {
-                    let lines: Vec<&str> = text.lines().collect();
-                    if let Some(first_line) = lines.first() {
-                        title = Some(first_line.trim().to_string());
-                    }
-                }
-                _ => {}
-            }
-        }
-
-        let word_count = Self::count_words(&text);
-
-        Ok(ExtractedContent {
-            text,
-            title,
-            doc_type: DocumentType::Markdown,
-            url: None,
             word_count,
             source_path: None,
         })
@@ -305,19 +221,6 @@ impl ContentExtractor {
 
     pub fn extract_from_pptx(&self, bytes: &[u8]) -> Result<ExtractedContent> {
         extractors::PptxExtractor::extract(bytes)
-    }
-
-    /// Auto-detect file type from bytes and extract
-    pub fn extract_from_bytes(&self, bytes: &[u8]) -> Result<ExtractedContent> {
-        let doc_type = Self::detect_type_from_bytes(bytes);
-        match doc_type {
-            DocumentType::Csv => self.extract_from_csv(bytes),
-            DocumentType::Docx => self.extract_from_docx(bytes),
-            DocumentType::Xlsx => self.extract_from_xlsx(bytes),
-            DocumentType::Pptx => self.extract_from_pptx(bytes),
-            DocumentType::Pdf => self.extract_from_pdf(bytes, None),
-            _ => Err(MomoError::Processing("Unsupported file type".into())),
-        }
     }
 
     fn extract_title(document: &Html) -> Option<String> {
@@ -723,42 +626,6 @@ mod tests {
     }
 
     #[test]
-    fn test_is_scanned_pdf_empty_text() {
-        assert!(ContentExtractor::is_scanned_pdf("", &[]));
-    }
-
-    #[test]
-    fn test_is_scanned_pdf_whitespace_only() {
-        assert!(ContentExtractor::is_scanned_pdf("   ", &[]));
-        assert!(ContentExtractor::is_scanned_pdf("\n\t\r", &[]));
-    }
-
-    #[test]
-    fn test_is_scanned_pdf_short_text() {
-        assert!(ContentExtractor::is_scanned_pdf("a b c", &[]));
-        assert!(ContentExtractor::is_scanned_pdf("123456789", &[]));
-    }
-
-    #[test]
-    fn test_is_scanned_pdf_boundary() {
-        assert!(ContentExtractor::is_scanned_pdf("123456789", &[]));
-        assert!(!ContentExtractor::is_scanned_pdf("1234567890", &[]));
-    }
-
-    #[test]
-    fn test_is_scanned_pdf_normal_text() {
-        let long_text =
-            "This is a normal PDF with plenty of text content that was extracted properly.";
-        assert!(!ContentExtractor::is_scanned_pdf(long_text, &[]));
-    }
-
-    #[test]
-    fn test_is_scanned_pdf_ignores_whitespace_padding() {
-        assert!(ContentExtractor::is_scanned_pdf("   abc   ", &[]));
-        assert!(!ContentExtractor::is_scanned_pdf("   1234567890   ", &[]));
-    }
-
-    #[test]
     fn test_looks_like_code_rust() {
         let rust_code = r#"
 use std::collections::HashMap;
@@ -901,40 +768,5 @@ fn main() {
             ContentExtractor::extract_source_path_from_url(&url),
             None
         );
-    }
-
-    #[tokio::test]
-    async fn test_scanned_pdf_without_ocr_provider_returns_ok() {
-        let extractor = ContentExtractor::new();
-        let pdf_bytes = [0x25, 0x50, 0x44, 0x46];
-
-        let result = extractor
-            .extract_from_pdf_with_ocr(&pdf_bytes, None, None, None)
-            .await;
-
-        match result {
-            Ok(extracted) => assert_eq!(extracted.doc_type, DocumentType::Pdf),
-            Err(_) => {}
-        }
-    }
-
-    #[tokio::test]
-    async fn test_scanned_pdf_with_unavailable_provider_returns_error() {
-        use crate::ocr::OcrProvider;
-
-        let extractor = ContentExtractor::new();
-        let ocr_provider = OcrProvider::unavailable("test");
-        let ocr_config = OcrConfig {
-            model: "local/tesseract".to_string(),
-            api_key: None,
-            base_url: None,
-            languages: "eng".to_string(),
-            timeout_secs: 60,
-            max_image_dimension: 4096,
-            min_image_dimension: 50,
-        };
-
-        assert!(ContentExtractor::is_scanned_pdf("", &[]));
-        assert!(!ocr_provider.is_available());
     }
 }

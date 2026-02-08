@@ -22,7 +22,7 @@ fn build_tag_filter(
             start_idx + i
         ));
         // LIKE pattern: match JSON array element containing this tag value
-        values.push(libsql::Value::from(format!("%\"{}%", tag)));
+        values.push(libsql::Value::from(format!("%\"{tag}%")));
     }
     (clauses.join(" OR "), values)
 }
@@ -57,33 +57,6 @@ impl ChunkRepository {
             Self::create(conn, chunk).await?;
         }
         Ok(())
-    }
-
-    pub async fn get_by_document_id(conn: &Connection, document_id: &str) -> Result<Vec<Chunk>> {
-        let mut rows = conn
-            .query(
-                "SELECT id, document_id, content, embedded_content, position, token_count, created_at 
-                 FROM chunks WHERE document_id = ?1 ORDER BY position",
-                params![document_id],
-            )
-            .await?;
-
-        let mut chunks = Vec::new();
-        while let Some(row) = rows.next().await? {
-            chunks.push(Chunk {
-                id: row.get(0)?,
-                document_id: row.get(1)?,
-                content: row.get(2)?,
-                embedded_content: row.get(3)?,
-                position: row.get(4)?,
-                token_count: row.get(5)?,
-                created_at: DateTime::parse_from_rfc3339(&row.get::<String>(6)?)
-                    .map(|dt| dt.with_timezone(&Utc))
-                    .unwrap_or_else(|_| Utc::now()),
-            });
-        }
-
-        Ok(chunks)
     }
 
     pub async fn update_embedding(
@@ -152,11 +125,10 @@ impl ChunkRepository {
                 JOIN documents d ON c.document_id = d.id
                 WHERE c.embedding IS NOT NULL
                   AND (1 - vector_distance_cos(c.embedding, vector32(?1))) >= ?2
-                  AND ({})
+                  AND ({tag_clause})
                 ORDER BY score DESC
                 LIMIT ?3
-                "#,
-                tag_clause
+                "#
             );
             (q, tag_vals)
         } else {
@@ -196,66 +168,6 @@ impl ChunkRepository {
         while let Some(row) = rows.next().await? {
             let score = row.get::<f64>(5)? as f32;
 
-            results.push(ChunkWithDocument {
-                chunk_id: row.get(0)?,
-                document_id: row.get(1)?,
-                chunk_content: row.get(2)?,
-                document_title: row.get(3)?,
-                document_metadata: serde_json::from_str(&row.get::<String>(4)?).unwrap_or_default(),
-                score,
-            });
-        }
-
-        Ok(results)
-    }
-
-    pub async fn search_with_vector_index(
-        conn: &Connection,
-        embedding: &[f32],
-        limit: u32,
-        container_tags: Option<&[String]>,
-    ) -> Result<Vec<ChunkWithDocument>> {
-        let embedding_json = serde_json::to_string(embedding)?;
-
-        let base_query = r#"
-            SELECT 
-                c.id as chunk_id,
-                c.document_id,
-                c.content as chunk_content,
-                d.title as document_title,
-                d.metadata as document_metadata,
-                1 - vector_distance_cos(c.embedding, vector32(?1)) as score
-            FROM vector_top_k('chunks_embedding_idx', vector32(?1), ?2) as v
-            JOIN chunks c ON c.rowid = v.id
-            JOIN documents d ON c.document_id = d.id
-        "#;
-
-        let (query, tag_values) = if let Some(tags) = container_tags {
-            if !tags.is_empty() {
-                // Fixed params: ?1=embedding, ?2=limit; tags start at ?3
-                let (tag_clause, tag_vals) = build_tag_filter(tags, 3, "d");
-                (format!("{} WHERE {}", base_query, tag_clause), tag_vals)
-            } else {
-                (base_query.to_string(), Vec::new())
-            }
-        } else {
-            (base_query.to_string(), Vec::new())
-        };
-
-        let mut param_values: Vec<libsql::Value> = vec![
-            libsql::Value::from(embedding_json),
-            libsql::Value::from(limit),
-        ];
-        param_values.extend(tag_values);
-
-        let mut rows = conn
-            .query(&query, libsql::params_from_iter(param_values))
-            .await?;
-
-        let mut results = Vec::new();
-        while let Some(row) = rows.next().await? {
-            // match pattern used in memories.rs: score is fetched as f64 then cast to f32
-            let score = row.get::<f64>(5)? as f32;
             results.push(ChunkWithDocument {
                 chunk_id: row.get(0)?,
                 document_id: row.get(1)?,
@@ -312,7 +224,7 @@ mod tests {
                     "SQL clause must not contain injection payload"
                 );
             }
-            other => panic!("Expected Text value, got {:?}", other),
+            other => panic!("Expected Text value, got {other:?}"),
         }
     }
 
@@ -326,7 +238,7 @@ mod tests {
                 assert!(s.contains("\"quotes\""));
                 assert!(s.starts_with("%\""));
             }
-            other => panic!("Expected Text value, got {:?}", other),
+            other => panic!("Expected Text value, got {other:?}"),
         }
     }
 }

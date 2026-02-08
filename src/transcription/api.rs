@@ -49,7 +49,7 @@ impl TranscriptionApiClient {
         let client = Client::builder()
             .timeout(timeout)
             .build()
-            .map_err(|e| MomoError::Transcription(format!("Failed to create HTTP client: {}", e)))?;
+            .map_err(|e| MomoError::Transcription(format!("Failed to create HTTP client: {e}")))?;
 
         Ok(Self {
             client,
@@ -107,7 +107,7 @@ impl TranscriptionApiClient {
         let file_part = multipart::Part::bytes(audio_bytes.to_vec())
             .file_name(file_name)
             .mime_str(&mime_type)
-            .map_err(|e| MomoError::Transcription(format!("Invalid MIME type: {}", e)))?;
+            .map_err(|e| MomoError::Transcription(format!("Invalid MIME type: {e}")))?;
 
         let form = multipart::Form::new()
             .part("file", file_part)
@@ -120,7 +120,7 @@ impl TranscriptionApiClient {
             .base_url
             .as_deref()
             .unwrap_or(OPENAI_BASE_URL);
-        let url = format!("{}/audio/transcriptions", base_url);
+        let url = format!("{base_url}/audio/transcriptions");
 
         let api_key = self
             .config
@@ -134,7 +134,7 @@ impl TranscriptionApiClient {
         let response = self
             .client
             .post(&url)
-            .header("Authorization", format!("Bearer {}", api_key))
+            .header("Authorization", format!("Bearer {api_key}"))
             .multipart(form)
             .send()
             .await
@@ -142,7 +142,7 @@ impl TranscriptionApiClient {
                 if e.is_timeout() {
                     MomoError::Transcription("Request timeout".to_string())
                 } else {
-                    MomoError::Transcription(format!("Request failed: {}", e))
+                    MomoError::Transcription(format!("Request failed: {e}"))
                 }
             })?;
 
@@ -161,7 +161,7 @@ impl TranscriptionApiClient {
 
         // Parse response
         let transcription_response: TranscriptionResponse = response.json().await.map_err(|e| {
-            MomoError::Transcription(format!("Failed to parse transcription response: {}", e))
+            MomoError::Transcription(format!("Failed to parse transcription response: {e}"))
         })?;
 
         if transcription_response.text.trim().is_empty() {
@@ -189,20 +189,16 @@ impl TranscriptionApiClient {
     fn map_http_error(&self, status: StatusCode, error_body: &str) -> MomoError {
         match status {
             StatusCode::UNAUTHORIZED => MomoError::Transcription(format!(
-                "Authentication failed (401): Invalid API key. Error: {}",
-                error_body
+                "Authentication failed (401): Invalid API key. Error: {error_body}"
             )),
             StatusCode::TOO_MANY_REQUESTS => MomoError::Transcription(format!(
-                "Rate limit exceeded (429): Too many requests. Error: {}",
-                error_body
+                "Rate limit exceeded (429): Too many requests. Error: {error_body}"
             )),
             StatusCode::INTERNAL_SERVER_ERROR => MomoError::Transcription(format!(
-                "Server error (500): The transcription service encountered an error. Error: {}",
-                error_body
+                "Server error (500): The transcription service encountered an error. Error: {error_body}"
             )),
             _ => MomoError::Transcription(format!(
-                "Transcription API error ({}): {}",
-                status, error_body
+                "Transcription API error ({status}): {error_body}"
             )),
         }
     }
@@ -354,7 +350,7 @@ mod tests {
 
         let error = result.unwrap_err();
         assert!(matches!(error, MomoError::Transcription(_)));
-        let error_msg = format!("{:?}", error);
+        let error_msg = format!("{error:?}");
         assert!(error_msg.contains("401"));
     }
 
@@ -384,7 +380,7 @@ mod tests {
 
         let error = result.unwrap_err();
         assert!(matches!(error, MomoError::Transcription(_)));
-        let error_msg = format!("{:?}", error);
+        let error_msg = format!("{error:?}");
         assert!(error_msg.contains("429"));
     }
 
@@ -414,7 +410,7 @@ mod tests {
 
         let error = result.unwrap_err();
         assert!(matches!(error, MomoError::Transcription(_)));
-        let error_msg = format!("{:?}", error);
+        let error_msg = format!("{error:?}");
         assert!(error_msg.contains("500"));
     }
 

@@ -12,6 +12,5 @@ pub use contradiction::ContradictionDetector;
 pub use extractor::MemoryExtractor;
 pub use filter::LlmFilter;
 pub use inference::InferenceEngine;
-pub use profile::ProfileGenerator;
 pub use relationship::RelationshipDetector;
 pub use temporal::TemporalSearchRanker;

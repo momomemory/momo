@@ -22,9 +22,7 @@ fn test_contradiction_negation_pattern() {
         assert_eq!(
             result.is_contradiction(),
             expected,
-            "Failed for: '{}' vs '{}'",
-            content1,
-            content2
+            "Failed for: '{content1}' vs '{content2}'"
         );
     }
 }
@@ -45,9 +43,7 @@ fn test_contradiction_antonym_patterns() {
         assert_eq!(
             result.is_contradiction(),
             expected,
-            "Failed for: '{}' vs '{}'",
-            content1,
-            content2
+            "Failed for: '{content1}' vs '{content2}'"
         );
     }
 }
@@ -68,9 +64,7 @@ fn test_no_contradiction_similar_content() {
         assert_eq!(
             result.is_contradiction(),
             expected,
-            "Failed for: '{}' vs '{}'",
-            content1,
-            content2
+            "Failed for: '{content1}' vs '{content2}'"
         );
     }
 }
@@ -90,9 +84,7 @@ fn test_no_contradiction_unrelated() {
         assert_eq!(
             result.is_contradiction(),
             expected,
-            "Failed for: '{}' vs '{}'",
-            content1,
-            content2
+            "Failed for: '{content1}' vs '{content2}'"
         );
     }
 }

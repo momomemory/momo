@@ -498,7 +498,7 @@ fn format_compacted_facts(compacted: &HashMap<String, Vec<String>>) -> Vec<Profi
     for (category, items) in compacted {
         for item in items {
             facts.push(ProfileFact {
-                memory: format!("[{}] {}", category, item),
+                memory: format!("[{category}] {item}"),
                 confidence: None,
                 created_at: Utc::now(),
             });

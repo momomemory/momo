@@ -27,7 +27,7 @@ impl CsvExtractor {
         // Collect all records
         let headers = reader
             .headers()
-            .map_err(|e| MomoError::Processing(format!("Failed to read CSV headers: {}", e)))?
+            .map_err(|e| MomoError::Processing(format!("Failed to read CSV headers: {e}")))?
             .iter()
             .map(|h| h.to_string())
             .collect::<Vec<_>>();
@@ -39,7 +39,7 @@ impl CsvExtractor {
         let mut records: Vec<Vec<String>> = Vec::new();
         for result in reader.records() {
             let record = result
-                .map_err(|e| MomoError::Processing(format!("Failed to read CSV record: {}", e)))?;
+                .map_err(|e| MomoError::Processing(format!("Failed to read CSV record: {e}")))?;
             records.push(record.iter().map(|f| f.to_string()).collect());
         }
 
@@ -139,7 +139,7 @@ fn convert_to_markdown(headers: &[String], records: &[Vec<String>]) -> String {
     result.push_str(" |\n");
 
     // Separator row - use minimum 3 dashes per column (markdown standard)
-    result.push_str("|");
+    result.push('|');
     for header in headers {
         let width = header.len().max(3);
         result.push_str(&"-".repeat(width + 2));
@@ -165,7 +165,7 @@ fn count_words(text: &str) -> i32 {
 
 #[cfg(test)]
 mod tests {
-    use super::*;
+    
 
     #[test]
     fn test_strip_bom() {

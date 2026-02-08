@@ -145,8 +145,7 @@ mod tests {
         let err_string = result.unwrap_err().to_string();
         assert!(
             err_string.contains("too small"),
-            "Error should indicate image is too small: {}",
-            err_string
+            "Error should indicate image is too small: {err_string}"
         );
     }
 

@@ -180,9 +180,8 @@ fn generate_slide_rels(slide_num: usize) -> String {
     format!(
         r#"<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
 <Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships">
-<Relationship Id="rId1" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/notesSlide" Target="../notesSlides/notesSlide{}.xml"/>
-</Relationships>"#,
-        slide_num
+<Relationship Id="rId1" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/notesSlide" Target="../notesSlides/notesSlide{slide_num}.xml"/>
+</Relationships>"#
     )
 }
 
@@ -312,8 +311,7 @@ fn test_pptx_corrupt() {
     let err_msg = result.unwrap_err().to_string();
     assert!(
         err_msg.contains("PPTX") || err_msg.contains("parse") || err_msg.contains("zip"),
-        "Error should mention PPTX/parsing: {}",
-        err_msg
+        "Error should mention PPTX/parsing: {err_msg}"
     );
 }
 

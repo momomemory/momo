@@ -11,7 +11,6 @@ pub struct MistralOcrClient {
     client: Client,
     api_key: String,
     base_url: String,
-    timeout_secs: u64,
 }
 
 #[derive(Clone, Debug)]
@@ -19,7 +18,6 @@ pub struct DeepSeekOcrClient {
     client: Client,
     api_key: String,
     base_url: String,
-    timeout_secs: u64,
 }
 
 #[derive(Clone, Debug)]
@@ -27,7 +25,6 @@ pub struct OpenAiVisionClient {
     client: Client,
     api_key: String,
     base_url: String,
-    timeout_secs: u64,
 }
 
 #[derive(Debug, Serialize)]
@@ -87,19 +84,18 @@ impl MistralOcrClient {
         let client = Client::builder()
             .timeout(Duration::from_secs(config.timeout_secs))
             .build()
-            .map_err(|e| MomoError::Ocr(format!("Failed to create HTTP client: {}", e)))?;
+            .map_err(|e| MomoError::Ocr(format!("Failed to create HTTP client: {e}")))?;
 
         Ok(Self {
             client,
             api_key,
             base_url,
-            timeout_secs: config.timeout_secs,
         })
     }
 
     pub async fn ocr(&self, image_bytes: &[u8]) -> Result<String> {
         let base64_image = STANDARD.encode(image_bytes);
-        let data_url = format!("data:image/png;base64,{}", base64_image);
+        let data_url = format!("data:image/png;base64,{base64_image}");
 
         let request = ChatRequest {
             model: "pixtral-12b-2409".to_string(),
@@ -138,7 +134,7 @@ impl MistralOcrClient {
                 Ok(resp) => {
                     if resp.status().is_success() {
                         let chat_response: ChatResponse = resp.json().await.map_err(|e| {
-                            MomoError::Ocr(format!("Failed to parse response: {}", e))
+                            MomoError::Ocr(format!("Failed to parse response: {e}"))
                         })?;
 
                         return chat_response
@@ -162,8 +158,7 @@ impl MistralOcrClient {
                         let status = resp.status();
                         let body = resp.text().await.unwrap_or_default();
                         return Err(MomoError::Ocr(format!(
-                            "API request failed: {} - {}",
-                            status, body
+                            "API request failed: {status} - {body}"
                         )));
                     }
                 }
@@ -171,8 +166,7 @@ impl MistralOcrClient {
                     retries += 1;
                     if retries >= max_retries {
                         return Err(MomoError::Ocr(format!(
-                            "API request failed after {} retries: {}",
-                            max_retries, e
+                            "API request failed after {max_retries} retries: {e}"
                         )));
                     }
                     let delay = Duration::from_millis(100 * (2_u64.pow(retries)));
@@ -198,19 +192,18 @@ impl DeepSeekOcrClient {
         let client = Client::builder()
             .timeout(Duration::from_secs(config.timeout_secs))
             .build()
-            .map_err(|e| MomoError::Ocr(format!("Failed to create HTTP client: {}", e)))?;
+            .map_err(|e| MomoError::Ocr(format!("Failed to create HTTP client: {e}")))?;
 
         Ok(Self {
             client,
             api_key,
             base_url,
-            timeout_secs: config.timeout_secs,
         })
     }
 
     pub async fn ocr(&self, image_bytes: &[u8]) -> Result<String> {
         let base64_image = STANDARD.encode(image_bytes);
-        let data_url = format!("data:image/png;base64,{}", base64_image);
+        let data_url = format!("data:image/png;base64,{base64_image}");
 
         let request = ChatRequest {
             model: "deepseek-vl".to_string(),
@@ -249,7 +242,7 @@ impl DeepSeekOcrClient {
                 Ok(resp) => {
                     if resp.status().is_success() {
                         let chat_response: ChatResponse = resp.json().await.map_err(|e| {
-                            MomoError::Ocr(format!("Failed to parse response: {}", e))
+                            MomoError::Ocr(format!("Failed to parse response: {e}"))
                         })?;
 
                         return chat_response
@@ -273,8 +266,7 @@ impl DeepSeekOcrClient {
                         let status = resp.status();
                         let body = resp.text().await.unwrap_or_default();
                         return Err(MomoError::Ocr(format!(
-                            "API request failed: {} - {}",
-                            status, body
+                            "API request failed: {status} - {body}"
                         )));
                     }
                 }
@@ -282,8 +274,7 @@ impl DeepSeekOcrClient {
                     retries += 1;
                     if retries >= max_retries {
                         return Err(MomoError::Ocr(format!(
-                            "API request failed after {} retries: {}",
-                            max_retries, e
+                            "API request failed after {max_retries} retries: {e}"
                         )));
                     }
                     let delay = Duration::from_millis(100 * (2_u64.pow(retries)));
@@ -309,19 +300,18 @@ impl OpenAiVisionClient {
         let client = Client::builder()
             .timeout(Duration::from_secs(config.timeout_secs))
             .build()
-            .map_err(|e| MomoError::Ocr(format!("Failed to create HTTP client: {}", e)))?;
+            .map_err(|e| MomoError::Ocr(format!("Failed to create HTTP client: {e}")))?;
 
         Ok(Self {
             client,
             api_key,
             base_url,
-            timeout_secs: config.timeout_secs,
         })
     }
 
     pub async fn ocr(&self, image_bytes: &[u8]) -> Result<String> {
         let base64_image = STANDARD.encode(image_bytes);
-        let data_url = format!("data:image/png;base64,{}", base64_image);
+        let data_url = format!("data:image/png;base64,{base64_image}");
 
         let request = ChatRequest {
             model: "gpt-4o".to_string(),
@@ -360,7 +350,7 @@ impl OpenAiVisionClient {
                 Ok(resp) => {
                     if resp.status().is_success() {
                         let chat_response: ChatResponse = resp.json().await.map_err(|e| {
-                            MomoError::Ocr(format!("Failed to parse response: {}", e))
+                            MomoError::Ocr(format!("Failed to parse response: {e}"))
                         })?;
 
                         return chat_response
@@ -384,8 +374,7 @@ impl OpenAiVisionClient {
                         let status = resp.status();
                         let body = resp.text().await.unwrap_or_default();
                         return Err(MomoError::Ocr(format!(
-                            "API request failed: {} - {}",
-                            status, body
+                            "API request failed: {status} - {body}"
                         )));
                     }
                 }
@@ -393,8 +382,7 @@ impl OpenAiVisionClient {
                     retries += 1;
                     if retries >= max_retries {
                         return Err(MomoError::Ocr(format!(
-                            "API request failed after {} retries: {}",
-                            max_retries, e
+                            "API request failed after {max_retries} retries: {e}"
                         )));
                     }
                     let delay = Duration::from_millis(100 * (2_u64.pow(retries)));

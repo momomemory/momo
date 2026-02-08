@@ -246,7 +246,7 @@ mod tests {
 
         // Then it should succeed
         if let Err(e) = &result {
-            eprintln!("Error: {:?}", e);
+            eprintln!("Error: {e:?}");
         }
         assert!(result.is_ok());
     }

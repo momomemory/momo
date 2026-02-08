@@ -1,6 +1,5 @@
 use momo::models::DocumentType;
 use momo::processing::extractors::xlsx::XlsxExtractor;
-use momo::processing::extractors::ExtractedContent;
 
 mod common;
 use common::{ensure_fixtures, load_fixture};
@@ -520,11 +519,10 @@ fn create_large_xlsx(row_count: usize) -> Vec<u8> {
         for i in 2..=actual_rows {
             sheet_xml.push_str(&format!(
                 r#"
-        <row r="{}">
-            <c r="A{}" t="s"><v>2</v></c>
-            <c r="B{}"><v>{}</v></c>
-        </row>"#,
-                i, i, i, i
+        <row r="{i}">
+            <c r="A{i}" t="s"><v>2</v></c>
+            <c r="B{i}"><v>{i}</v></c>
+        </row>"#
             ));
         }
 

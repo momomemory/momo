@@ -50,7 +50,7 @@ impl std::str::FromStr for ProcessingStatus {
             "indexing" => Ok(Self::Indexing),
             "done" => Ok(Self::Done),
             "failed" => Ok(Self::Failed),
-            _ => Err(format!("Unknown processing status: {}", s)),
+            _ => Err(format!("Unknown processing status: {s}")),
         }
     }
 }
@@ -165,7 +165,7 @@ impl std::str::FromStr for MemoryRelationType {
             "updates" => Ok(Self::Updates),
             "extends" => Ok(Self::Extends),
             "derives" => Ok(Self::Derives),
-            _ => Err(format!("Unknown relation type: {}", s)),
+            _ => Err(format!("Unknown relation type: {s}")),
         }
     }
 }
@@ -180,7 +180,7 @@ pub struct Pagination {
 
 impl Pagination {
     pub fn new(current_page: u32, limit: u32, total_items: u32) -> Self {
-        let total_pages = (total_items + limit - 1) / limit;
+        let total_pages = total_items.div_ceil(limit);
         Self {
             current_page,
             limit,
@@ -226,7 +226,7 @@ impl std::str::FromStr for MemoryType {
             "fact" => Ok(Self::Fact),
             "preference" => Ok(Self::Preference),
             "episode" => Ok(Self::Episode),
-            _ => Err(format!("Unknown memory type: {}", s)),
+            _ => Err(format!("Unknown memory type: {s}")),
         }
     }
 }

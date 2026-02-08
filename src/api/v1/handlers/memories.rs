@@ -210,7 +210,7 @@ pub async fn list_memories(
         .and_then(|c| c.parse::<u32>().ok())
         .unwrap_or(1);
 
-    let offset = ((page - 1) * limit) as u32;
+    let offset = (page - 1) * limit;
 
     // Use get_user_profile to fetch memories for the container tag.
     // We request a large limit and paginate in-memory, since the DB trait

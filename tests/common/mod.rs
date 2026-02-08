@@ -13,7 +13,7 @@ pub fn fixture_path(name: &str) -> PathBuf {
 /// Load a fixture file as bytes
 pub fn load_fixture(name: &str) -> Vec<u8> {
     let path = fixture_path(name);
-    fs::read(&path).unwrap_or_else(|e| panic!("Failed to load fixture '{}': {}", name, e))
+    fs::read(&path).unwrap_or_else(|e| panic!("Failed to load fixture '{name}': {e}"))
 }
 
 /// Ensure all fixture files exist, generating them if necessary

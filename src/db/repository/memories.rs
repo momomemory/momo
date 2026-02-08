@@ -156,15 +156,6 @@ impl MemoryRepository {
         Ok(())
     }
 
-    pub async fn update_last_accessed(conn: &Connection, id: &str) -> Result<()> {
-        conn.execute(
-            "UPDATE memories SET last_accessed = ?2, updated_at = ?3 WHERE id = ?1",
-            params![id, Utc::now().to_rfc3339(), Utc::now().to_rfc3339()],
-        )
-        .await?;
-
-        Ok(())
-    }
     pub async fn update_last_accessed_batch(conn: &Connection, ids: &[&str]) -> Result<u64> {
         if ids.is_empty() {
             return Ok(0);
@@ -178,7 +169,7 @@ impl MemoryRepository {
             if i > 0 {
                 placeholders.push_str(", ");
             }
-            placeholders.push_str("?");
+            placeholders.push('?');
             placeholders.push_str(&(i + 1).to_string());
         }
 
@@ -269,7 +260,7 @@ impl MemoryRepository {
         let query = if container_tag.is_some() {
             format!(
                 r#"
-                SELECT {},
+                SELECT {columns},
                        1 - vector_distance_cos(m.embedding, vector32(?1)) as score
                 FROM memories m
                 WHERE m.embedding IS NOT NULL
@@ -277,27 +268,25 @@ impl MemoryRepository {
                   AND m.is_forgotten = 0
                   AND m.container_tag = ?4
                   AND (1 - vector_distance_cos(m.embedding, vector32(?1))) >= ?2
-                  {}
+                  {forget_after_filter}
                 ORDER BY score DESC
                 LIMIT ?3
-                "#,
-                columns, forget_after_filter
+                "#
             )
         } else {
             format!(
                 r#"
-                SELECT {},
+                SELECT {columns},
                        1 - vector_distance_cos(m.embedding, vector32(?1)) as score
                 FROM memories m
                 WHERE m.embedding IS NOT NULL
                   AND m.is_latest = 1
                   AND m.is_forgotten = 0
                   AND (1 - vector_distance_cos(m.embedding, vector32(?1))) >= ?2
-                  {}
+                  {forget_after_filter}
                 ORDER BY score DESC
                 LIMIT ?3
-                "#,
-                columns, forget_after_filter
+                "#
             )
         };
 
@@ -434,8 +423,8 @@ impl MemoryRepository {
         for id in source_ids {
             // Protect quotes inside JSON path
             let escaped = id.replace('"', "\\\"");
-            let path = format!("$.\"{}\"", escaped);
-            where_clauses.push(format!("json_extract(memory_relations, ?) = 'derives'"));
+            let path = format!("$.\"{escaped}\"");
+            where_clauses.push("json_extract(memory_relations, ?) = 'derives'".to_string());
             params_vec.push(libsql::Value::from(path));
         }
 
@@ -451,8 +440,7 @@ impl MemoryRepository {
         let where_joined = where_clauses.join(" AND ");
 
         let sql = format!(
-            "SELECT COUNT(*) FROM memories WHERE is_inference = 1 AND is_forgotten = 0 AND is_latest = 1 AND ({})",
-            where_joined
+            "SELECT COUNT(*) FROM memories WHERE is_inference = 1 AND is_forgotten = 0 AND is_latest = 1 AND ({where_joined})"
         );
 
         let mut rows = conn
@@ -564,7 +552,7 @@ impl MemoryRepository {
     ) -> Result<()> {
         let existing = Self::get_by_id(conn, id).await?;
         let memory = existing.ok_or_else(|| {
-            crate::error::MomoError::NotFound(format!("Memory not found: {}", id))
+            crate::error::MomoError::NotFound(format!("Memory not found: {id}"))
         })?;
 
         let mut merged_relations = memory.memory_relations.clone();
@@ -642,8 +630,7 @@ impl MemoryRepository {
         }
 
         let sql = format!(
-            "SELECT memory_id, document_id FROM memory_sources WHERE memory_id IN ({})",
-            placeholders
+            "SELECT memory_id, document_id FROM memory_sources WHERE memory_id IN ({placeholders})"
         );
 
         let params: Vec<libsql::Value> = memory_ids.iter().map(|id| libsql::Value::from(id.clone())).collect();
@@ -703,7 +690,7 @@ impl MemoryRepository {
                 let edge_type = Self::relation_to_edge_type(relation_type);
 
                 // Skip edges that don't match the requested relation types
-                if let Some(ref types) = relation_types {
+                if let Some(types) = relation_types {
                     if !types.contains(&edge_type) {
                         continue;
                     }
@@ -726,7 +713,7 @@ impl MemoryRepository {
                     if !visited.contains(&ref_memory.id) {
                         if let Some(rel_type) = ref_memory.memory_relations.get(&current_id) {
                             let edge_type = Self::relation_to_edge_type(rel_type);
-                            if let Some(ref types) = relation_types {
+                            if let Some(types) = relation_types {
                                 if !types.contains(&edge_type) {
                                     continue;
                                 }
@@ -1056,7 +1043,7 @@ mod tests {
     ) -> Memory {
         let mut memory = Memory::new(
             id.to_string(),
-            format!("Test memory {}", id),
+            format!("Test memory {id}"),
             "space1".to_string(),
         );
         memory.forget_after = forget_after;
@@ -1112,9 +1099,9 @@ mod tests {
         let conn = setup_test_db().await;
 
         for i in 1..=3 {
-            let id = format!("e{}", i);
+            let id = format!("e{i}");
             let mut memory =
-                Memory::new(id.clone(), format!("Episode {}", i), "space1".to_string());
+                Memory::new(id.clone(), format!("Episode {i}"), "space1".to_string());
             memory.memory_type = crate::models::MemoryType::Episode;
             MemoryRepository::create(&conn, &memory).await.unwrap();
         }
@@ -1250,7 +1237,7 @@ mod tests {
 
         assert_eq!(candidates.len(), 1);
         assert_eq!(candidates[0].id, "expired1");
-        assert_eq!(candidates[0].is_forgotten, false);
+        assert!(!candidates[0].is_forgotten);
     }
 
     #[tokio::test]
@@ -1344,8 +1331,8 @@ mod tests {
         let past_date = Utc::now() - chrono::Duration::hours(2);
         for i in 1..=3 {
             let mut memory = Memory::new(
-                format!("expired{}", i),
-                format!("Memory {}", i),
+                format!("expired{i}"),
+                format!("Memory {i}"),
                 "space1".to_string(),
             );
             memory.forget_after = Some(past_date);
@@ -1481,13 +1468,13 @@ mod tests {
 
         let exists = MemoryRepository::check_inference_exists(
             &conn,
-            &vec!["s1".to_string(), "s2".to_string()],
+            &["s1".to_string(), "s2".to_string()],
         )
         .await
         .unwrap();
         assert!(exists);
 
-        let not_exists = MemoryRepository::check_inference_exists(&conn, &vec!["s3".to_string()])
+        let not_exists = MemoryRepository::check_inference_exists(&conn, &["s3".to_string()])
             .await
             .unwrap();
         assert!(!not_exists);
@@ -1589,7 +1576,7 @@ mod tests {
         let conn = setup_test_db().await;
 
         for id in &["m1", "m2", "m3"] {
-            let mem = Memory::new(id.to_string(), format!("Memory {}", id), "space1".to_string());
+            let mem = Memory::new(id.to_string(), format!("Memory {id}"), "space1".to_string());
             MemoryRepository::create(&conn, &mem).await.unwrap();
         }
 

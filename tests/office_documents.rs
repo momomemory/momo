@@ -159,8 +159,7 @@ fn test_integration_all_formats() {
         assert_eq!(
             result.unwrap().doc_type,
             expected_type,
-            "Wrong type for {}",
-            filename
+            "Wrong type for {filename}"
         );
     }
 }

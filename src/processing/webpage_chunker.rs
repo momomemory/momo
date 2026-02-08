@@ -2,6 +2,7 @@ use crate::config::ProcessingConfig;
 
 use super::{ChunkContext, ContentChunker, MarkdownChunker, TextChunk, TextChunker};
 
+#[derive(Default)]
 pub struct WebpageChunker {
     markdown_chunker: MarkdownChunker,
     fallback_chunker: TextChunker,
@@ -37,14 +38,6 @@ impl ContentChunker for WebpageChunker {
     }
 }
 
-impl Default for WebpageChunker {
-    fn default() -> Self {
-        Self {
-            markdown_chunker: MarkdownChunker::default(),
-            fallback_chunker: TextChunker::default(),
-        }
-    }
-}
 
 #[cfg(test)]
 mod tests {

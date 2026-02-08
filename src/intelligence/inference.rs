@@ -390,7 +390,8 @@ mod tests {
 
     use super::*;
     use crate::config::{DatabaseConfig, EmbeddingsConfig, LlmConfig};
-    use crate::db::{Database, LibSqlBackend, MemoryRepository};
+    use crate::db::{Database, LibSqlBackend};
+    use crate::db::repository::MemoryRepository;
 
     // ── Test helpers ──────────────────────────────────────────────────
 
@@ -985,13 +986,13 @@ mod tests {
         // Create multiple seeds
         for i in 1..=5 {
             let mem = test_memory(
-                &format!("mem_{}", i),
-                &format!("Fact number {}", i),
+                &format!("mem_{i}"),
+                &format!("Fact number {i}"),
                 Some("user_1"),
             );
             MemoryRepository::create(&conn, &mem).await.unwrap();
             let embedding = vec![0.1_f32; 384];
-            MemoryRepository::update_embedding(&conn, &format!("mem_{}", i), &embedding)
+            MemoryRepository::update_embedding(&conn, &format!("mem_{i}"), &embedding)
                 .await
                 .unwrap();
         }

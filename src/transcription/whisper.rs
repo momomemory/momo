@@ -39,7 +39,7 @@ impl WhisperContext {
         let params = WhisperContextParameters::default();
 
         let ctx = WhisperRsContext::new_with_params(model_path, params).map_err(|e| {
-            MomoError::Transcription(format!("Failed to load Whisper model: {}", e))
+            MomoError::Transcription(format!("Failed to load Whisper model: {e}"))
         })?;
 
         info!("Whisper context initialized successfully");
@@ -73,7 +73,7 @@ impl WhisperContext {
         );
 
         let result = tokio::task::spawn_blocking(move || {
-            let mut ctx = context.blocking_lock();
+            let ctx = context.blocking_lock();
 
             let mut params = FullParams::new(SamplingStrategy::Greedy { best_of: 1 });
             params.set_print_progress(false);
@@ -81,11 +81,11 @@ impl WhisperContext {
 
             let mut state = ctx
                 .create_state()
-                .map_err(|e| MomoError::Transcription(format!("Failed to create Whisper state: {}", e)))?;
+                .map_err(|e| MomoError::Transcription(format!("Failed to create Whisper state: {e}")))?;
 
             state
                 .full(params, &samples)
-                .map_err(|e| MomoError::Transcription(format!("Transcription failed: {}", e)))?;
+                .map_err(|e| MomoError::Transcription(format!("Transcription failed: {e}")))?;
 
             let num_segments = state.full_n_segments();
             if num_segments < 0 {
@@ -104,15 +104,13 @@ impl WhisperContext {
                         }
                         Err(e) => {
                             return Err(MomoError::Transcription(format!(
-                                "Failed to get text for segment {}: {}",
-                                i, e
+                                "Failed to get text for segment {i}: {e}"
                             )));
                         }
                     }
                 } else {
                     return Err(MomoError::Transcription(format!(
-                        "Failed to get segment {}",
-                        i
+                        "Failed to get segment {i}"
                     )));
                 }
             }
@@ -120,7 +118,7 @@ impl WhisperContext {
             Ok::<String, MomoError>(transcript.trim().to_string())
         })
         .await
-        .map_err(|e| MomoError::Transcription(format!("Transcription task panicked: {}", e)))??;
+        .map_err(|e| MomoError::Transcription(format!("Transcription task panicked: {e}")))??;
 
         info!(
             text_length = result.len(),
@@ -180,7 +178,7 @@ mod tests {
 
     #[tokio::test]
     async fn test_transcribe_silence() {
-        let silence = vec![0.0f32; 16000];
+        let _silence = vec![0.0f32; 16000];
 
         let config = create_test_config(Some("/nonexistent/model.bin"));
         let result = WhisperContext::new(&config);
@@ -202,7 +200,7 @@ mod tests {
 
     #[test]
     fn test_whisper_context_clone() {
-        let config = create_test_config(None);
+        let _config = create_test_config(None);
         let mock_config = create_test_config(Some("/tmp/mock"));
         assert_eq!(mock_config.model, "local/whisper-small");
     }
@@ -239,6 +237,6 @@ mod tests {
         assert!(result.is_ok());
 
         let text = result.unwrap();
-        println!("Transcribed text: {}", text);
+        println!("Transcribed text: {text}");
     }
 }

@@ -158,7 +158,8 @@ mod tests {
 
     use super::*;
     use crate::config::{DatabaseConfig, EmbeddingsConfig, LlmConfig};
-    use crate::db::{Database, LibSqlBackend, MemoryRepository};
+    use crate::db::{Database, LibSqlBackend};
+    use crate::db::repository::MemoryRepository;
     use crate::models::Memory;
 
     async fn test_embeddings_provider() -> (EmbeddingProvider, MockServer) {

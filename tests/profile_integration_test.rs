@@ -7,7 +7,8 @@ use wiremock::matchers::{method, path};
 use wiremock::{Mock, MockServer, ResponseTemplate};
 
 use momo::config::{DatabaseConfig, LlmConfig};
-use momo::db::{Database, DatabaseBackend, LibSqlBackend, MemoryRepository};
+use momo::db::{Database, LibSqlBackend};
+use momo::db::repository::MemoryRepository;
 use momo::llm::LlmProvider;
 use momo::models::{Memory, MemoryType};
 use momo::services::ProfileRefreshManager;

@@ -7,7 +7,7 @@ pub struct DocxExtractor;
 impl DocxExtractor {
     pub fn extract(bytes: &[u8]) -> Result<ExtractedContent> {
         let docx = docx_rs::read_docx(bytes)
-            .map_err(|e| MomoError::Processing(format!("DOCX parse error: {}", e)))?;
+            .map_err(|e| MomoError::Processing(format!("DOCX parse error: {e}")))?;
 
         let mut text = String::new();
         let mut title = None;
@@ -65,7 +65,7 @@ impl DocxExtractor {
                 // Extract heading level from "Heading1", "Heading2", etc.
                 if let Some(level_str) = style.val.strip_prefix("Heading") {
                     if let Ok(level) = level_str.parse::<u8>() {
-                        if level >= 1 && level <= 6 {
+                        if (1..=6).contains(&level) {
                             "#".repeat(level as usize) + " "
                         } else {
                             String::new()
@@ -123,7 +123,7 @@ impl DocxExtractor {
         if let Some(numbering) = &paragraph.property.numbering_property {
             // Check for numbered list (ilvl indicates list level)
             if let Some(ilvl) = &numbering.level {
-                let level = ilvl.val as usize;
+                let level = ilvl.val;
                 let indent = "  ".repeat(level);
 
                 // Check if it's a numbered list by looking at the num_id
@@ -133,12 +133,12 @@ impl DocxExtractor {
                     // Even num_ids typically indicate bullet lists, odd indicate numbered lists
                     let num = num_id.id;
                     if num % 2 == 0 {
-                        format!("{}- ", indent)
+                        format!("{indent}- ")
                     } else {
-                        format!("{}1. ", indent)
+                        format!("{indent}1. ")
                     }
                 } else {
-                    format!("{}- ", indent)
+                    format!("{indent}- ")
                 }
             } else {
                 String::new()
@@ -160,7 +160,7 @@ impl DocxExtractor {
                 let mut cell_text = String::new();
                 for cell_child in &cell.children {
                     if let docx_rs::TableCellContent::Paragraph(para) = cell_child {
-                        let para_text = Self::extract_paragraph_text_only(&para);
+                        let para_text = Self::extract_paragraph_text_only(para);
                         if !cell_text.is_empty() {
                             cell_text.push(' ');
                         }
@@ -193,7 +193,7 @@ impl DocxExtractor {
         result.push_str(" |\n");
 
         // Separator
-        result.push_str("|");
+        result.push('|');
         for _ in 0..col_count {
             result.push_str("------|");
         }

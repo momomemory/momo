@@ -40,7 +40,7 @@ mod tests {
     fn test_container_filter_model() {
         let filter = ContainerFilter::new("user_123".to_string());
         assert_eq!(filter.tag, "user_123");
-        assert_eq!(filter.should_llm_filter, false);
+        assert!(!filter.should_llm_filter);
         assert_eq!(filter.filter_prompt, None);
     }
 

@@ -53,7 +53,7 @@ impl Database {
     }
 
     pub async fn sync(&self) -> Result<()> {
-        if let Some(sync) = self.db.sync().await.ok() {
+        if let Ok(sync) = self.db.sync().await {
             tracing::info!("Database synced: {:?}", sync);
         }
         Ok(())

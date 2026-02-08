@@ -18,13 +18,13 @@ fn map_json_rejection(rejection: JsonRejection) -> MomoError {
         JsonRejection::JsonDataError(err) => {
             let message = err.to_string();
             if let Some(field) = extract_missing_field(&message) {
-                MomoError::Validation(format!("Missing required field: {}", field))
+                MomoError::Validation(format!("Missing required field: {field}"))
             } else {
-                MomoError::Validation(format!("Invalid JSON: {}", message))
+                MomoError::Validation(format!("Invalid JSON: {message}"))
             }
         }
         JsonRejection::JsonSyntaxError(err) => {
-            MomoError::Validation(format!("JSON syntax error: {}", err))
+            MomoError::Validation(format!("JSON syntax error: {err}"))
         }
         JsonRejection::MissingJsonContentType(_) => {
             MomoError::Validation("Missing `Content-Type: application/json` header".to_string())

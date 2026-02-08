@@ -258,8 +258,6 @@ mod tests {
         let req: SearchRequest = serde_json::from_str(json).expect("deserialize");
         assert!(req.include.documents);
         assert!(!req.include.chunks);
-        assert!(req.include.memories);
-        assert!(!req.include.graph_context);
     }
 
     #[test]
@@ -272,9 +270,7 @@ mod tests {
             "limit": 25,
             "include": {
                 "documents": true,
-                "chunks": true,
-                "memories": false,
-                "graphContext": true
+                "chunks": true
             },
             "rerank": true
         }"#;
@@ -289,8 +285,6 @@ mod tests {
         assert_eq!(req.limit, Some(25));
         assert!(req.include.documents);
         assert!(req.include.chunks);
-        assert!(!req.include.memories);
-        assert!(req.include.graph_context);
         assert_eq!(req.rerank, Some(true));
     }
 

@@ -12,7 +12,7 @@ impl XlsxExtractor {
     pub fn extract(bytes: &[u8]) -> Result<ExtractedContent> {
         let cursor = Cursor::new(bytes);
         let mut workbook = open_workbook_auto_from_rs(cursor)
-            .map_err(|e| MomoError::Processing(format!("XLSX parse error: {}", e)))?;
+            .map_err(|e| MomoError::Processing(format!("XLSX parse error: {e}")))?;
 
         let mut text = String::new();
 
@@ -22,7 +22,7 @@ impl XlsxExtractor {
             // Guard against pathological files with excessive rows
             let row_limit = rows.min(Self::MAX_ROWS);
 
-            text.push_str(&format!("## Sheet: {}\n\n", name));
+            text.push_str(&format!("## Sheet: {name}\n\n"));
 
             if rows == 0 || cols == 0 {
                 // Empty sheet - just add the header and continue
@@ -56,7 +56,7 @@ impl XlsxExtractor {
                 text.push_str(" |\n");
 
                 // Separator
-                text.push_str("|");
+                text.push('|');
                 for _ in 0..cols {
                     text.push_str("------|");
                 }
@@ -104,7 +104,7 @@ impl XlsxExtractor {
             Some(Data::Int(i)) => i.to_string(),
             Some(Data::Float(f)) => {
                 // Format float nicely - remove trailing zeros
-                let s = format!("{}", f);
+                let s = format!("{f}");
                 if s.contains('.') {
                     s.trim_end_matches('0').trim_end_matches('.').to_string()
                 } else {

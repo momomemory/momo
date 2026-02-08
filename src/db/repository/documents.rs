@@ -189,7 +189,7 @@ impl DocumentRepository {
             if !tags.is_empty() {
                 for (i, tag) in tags.iter().enumerate() {
                     where_clauses.push(format!("container_tags LIKE ?{}", i + 1));
-                    tag_params.push(libsql::Value::from(format!("%\"{}%", tag)));
+                    tag_params.push(libsql::Value::from(format!("%\"{tag}%")));
                 }
             }
         }
@@ -200,7 +200,7 @@ impl DocumentRepository {
             format!("WHERE {}", where_clauses.join(" OR "))
         };
 
-        let count_query = format!("SELECT COUNT(*) FROM documents {}", where_clause);
+        let count_query = format!("SELECT COUNT(*) FROM documents {where_clause}");
         let mut count_rows = conn
             .query(&count_query, libsql::params_from_iter(tag_params.clone()))
             .await?;
@@ -214,8 +214,7 @@ impl DocumentRepository {
         let limit_idx = tag_params.len() + 1;
         let offset_idx = tag_params.len() + 2;
         let query = format!(
-            "SELECT * FROM documents {} {} LIMIT ?{} OFFSET ?{}",
-            where_clause, order_clause, limit_idx, offset_idx
+            "SELECT * FROM documents {where_clause} {order_clause} LIMIT ?{limit_idx} OFFSET ?{offset_idx}"
         );
 
         let mut list_params = tag_params;
@@ -452,15 +451,13 @@ mod tests {
             let result = DocumentRepository::list(&conn, &req).await;
             assert!(
                 result.is_ok(),
-                "SQL injection payload should not cause error: {}",
-                payload
+                "SQL injection payload should not cause error: {payload}"
             );
             let (results, _) = result.unwrap();
             assert_eq!(
                 results.len(),
                 0,
-                "injection payload '{}' should match no documents",
-                payload
+                "injection payload '{payload}' should match no documents"
             );
         }
 

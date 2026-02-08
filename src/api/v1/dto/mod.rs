@@ -16,9 +16,7 @@ pub mod search;
 // Re-export all public types for convenient access via `dto::*`.
 pub use admin::*;
 pub use common::*;
-pub use conversation::*;
 pub use documents::*;
 pub use graph::*;
 pub use memories::*;
-pub use profile::*;
 pub use search::*;

@@ -240,8 +240,7 @@ mod tests {
         let relevance = memory.calculate_episode_relevance(30.0, 0.9);
         assert!(
             (relevance - 0.5).abs() < 0.01,
-            "Sigmoid should be 0.5 at midpoint (decay_days), got {}",
-            relevance
+            "Sigmoid should be 0.5 at midpoint (decay_days), got {relevance}"
         );
     }
 
@@ -274,8 +273,7 @@ mod tests {
         let relevance = memory.calculate_episode_relevance(30.0, 0.9);
         assert!(
             relevance < 0.1,
-            "Very old episode should have near-zero relevance, got {}",
-            relevance
+            "Very old episode should have near-zero relevance, got {relevance}"
         );
     }
 
@@ -288,8 +286,7 @@ mod tests {
         let relevance = memory.calculate_episode_relevance(30.0, 0.9);
         assert!(
             relevance > 0.8,
-            "Recent episode should have high relevance, got {}",
-            relevance
+            "Recent episode should have high relevance, got {relevance}"
         );
     }
 
@@ -311,7 +308,7 @@ mod tests {
         let r2 = m2.calculate_episode_relevance(30.0, 0.9);
         let r3 = m3.calculate_episode_relevance(30.0, 0.9);
 
-        assert!(r1 > r2, "10-day should beat 30-day: {} vs {}", r1, r2);
-        assert!(r2 > r3, "30-day should beat 60-day: {} vs {}", r2, r3);
+        assert!(r1 > r2, "10-day should beat 30-day: {r1} vs {r2}");
+        assert!(r2 > r3, "30-day should beat 60-day: {r2} vs {r3}");
     }
 }

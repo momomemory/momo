@@ -1,6 +1,7 @@
 use momo::api::create_router;
 use momo::config::{Config, DatabaseConfig, EmbeddingsConfig, LlmConfig};
-use momo::db::{Database, DatabaseBackend, LibSqlBackend, MemoryRepository, MemorySourcesRepository, DocumentRepository};
+use momo::db::{Database, DatabaseBackend, LibSqlBackend};
+use momo::db::repository::{MemoryRepository, MemorySourcesRepository, DocumentRepository};
 use momo::embeddings::EmbeddingProvider;
 use momo::llm::LlmProvider;
 use momo::ocr::OcrProvider;
@@ -115,7 +116,7 @@ async fn setup_test_app() -> (SocketAddr, TempDir, MockServer, Database) {
 async fn test_graph_endpoints_return_expected_nodes_and_edges() {
     let (addr, _tmp, _mock, db) = setup_test_app().await;
     let client = reqwest::Client::new();
-    let base_url = format!("http://{}", addr);
+    let base_url = format!("http://{addr}");
 
     // Prepare DB: create three memories with relations and one document source
     let conn = db.connect().expect("connect");
@@ -139,13 +140,13 @@ async fn test_graph_endpoints_return_expected_nodes_and_edges() {
     let mut doc = Document::new("doc1".to_string());
     doc.title = Some("Doc 1".to_string());
     DocumentRepository::create(&conn, &doc).await.expect("create doc");
-    MemorySourcesRepository::create(&conn, &"m1", &"doc1", None)
+    MemorySourcesRepository::create(&conn, "m1", "doc1", None)
         .await
         .expect("create memory source");
 
     // Call memory neighborhood graph
     let res = client
-        .get(format!("{}/v4/memories/m1/graph?depth=2&max_nodes=50", base_url))
+        .get(format!("{base_url}/v4/memories/m1/graph?depth=2&max_nodes=50"))
         .send()
         .await
         .expect("request");
@@ -197,7 +198,7 @@ async fn test_graph_endpoints_return_expected_nodes_and_edges() {
 
     // Container-level graph
     let res2 = client
-        .get(format!("{}/v4/containers/graph_test/graph?max_nodes=100", base_url))
+        .get(format!("{base_url}/v4/containers/graph_test/graph?max_nodes=100"))
         .send()
         .await
         .expect("request2");

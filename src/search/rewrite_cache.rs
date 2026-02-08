@@ -141,9 +141,9 @@ mod tests {
         for i in 0..10 {
             let cache_clone = cache.clone();
             let handle = thread::spawn(move || {
-                let query = format!("query_{}", i);
+                let query = format!("query_{i}");
                 let key = cache_clone.generate_key(&query);
-                let value = format!("rewritten_{}", i);
+                let value = format!("rewritten_{i}");
 
                 cache_clone.put(key.clone(), value.clone());
 

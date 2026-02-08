@@ -54,10 +54,7 @@ pub trait DocumentStore: Send + Sync {
 /// CRUD and vector-search operations for chunks.
 #[async_trait]
 pub trait ChunkStore: Send + Sync {
-    async fn create_chunk(&self, chunk: &Chunk) -> Result<()>;
     async fn create_chunks_batch(&self, chunks: &[Chunk]) -> Result<()>;
-    async fn get_chunks_by_document_id(&self, document_id: &str) -> Result<Vec<Chunk>>;
-    async fn update_chunk_embedding(&self, chunk_id: &str, embedding: &[f32]) -> Result<()>;
     async fn update_chunk_embeddings_batch(&self, updates: &[(String, Vec<f32>)]) -> Result<()>;
     async fn delete_chunks_by_document_id(&self, document_id: &str) -> Result<()>;
     async fn search_similar_chunks(
@@ -65,12 +62,6 @@ pub trait ChunkStore: Send + Sync {
         embedding: &[f32],
         limit: u32,
         threshold: f32,
-        container_tags: Option<&[String]>,
-    ) -> Result<Vec<ChunkWithDocument>>;
-    async fn search_chunks_with_index(
-        &self,
-        embedding: &[f32],
-        limit: u32,
         container_tags: Option<&[String]>,
     ) -> Result<Vec<ChunkWithDocument>>;
 
@@ -91,7 +82,6 @@ pub trait MemoryStore: Send + Sync {
     ) -> Result<Option<Memory>>;
     async fn update_memory_to_not_latest(&self, id: &str) -> Result<()>;
     async fn forget_memory(&self, id: &str, reason: Option<&str>) -> Result<()>;
-    async fn update_memory_last_accessed(&self, id: &str) -> Result<()>;
     async fn update_memory_last_accessed_batch(&self, ids: &[&str]) -> Result<u64>;
     async fn update_memory_source_count(&self, id: &str, new_count: i32) -> Result<()>;
     async fn update_memory_version_chain(
@@ -187,14 +177,11 @@ pub trait MemorySourceStore: Send + Sync {
         chunk_id: Option<&str>,
     ) -> Result<MemorySource>;
     async fn get_sources_by_memory(&self, memory_id: &str) -> Result<Vec<MemorySource>>;
-    async fn get_sources_by_document(&self, document_id: &str) -> Result<Vec<MemorySource>>;
 }
 
 /// Key-value metadata store (e.g. embedding dimensions).
 #[async_trait]
 pub trait MetadataStore: Send + Sync {
-    async fn get_metadata(&self, key: &str) -> Result<Option<String>>;
-    async fn set_metadata(&self, key: &str, value: &str) -> Result<()>;
     async fn get_embedding_dimensions(&self) -> Result<Option<usize>>;
     async fn set_embedding_dimensions(&self, dims: usize) -> Result<()>;
 }
@@ -209,15 +196,9 @@ pub trait MetadataStore: Send + Sync {
 pub trait DatabaseBackend:
     DocumentStore + ChunkStore + MemoryStore + MemorySourceStore + MetadataStore
 {
-    /// Run schema migrations / initialisation.
-    async fn initialize(&self) -> Result<()>;
-
     /// Sync with remote (e.g. Turso replication). No-op for local-only backends.
     async fn sync(&self) -> Result<()>;
 
     /// Get filter configuration for a container tag
     async fn get_container_filter(&self, tag: &str) -> Result<Option<ContainerFilter>>;
-
-    /// Set filter configuration for a container tag
-    async fn set_container_filter(&self, tag: &str, filter: &ContainerFilter) -> Result<()>;
 }

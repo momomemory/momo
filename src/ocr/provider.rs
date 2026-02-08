@@ -44,13 +44,6 @@ pub struct OcrProvider {
     config: OcrConfig,
 }
 
-pub fn tesseract_available() -> bool {
-    match LepTess::new(None, "eng") {
-        Ok(_) => true,
-        Err(_) => false,
-    }
-}
-
 fn create_tesseract(languages: &str) -> std::result::Result<LepTess, String> {
     LepTess::new(None, languages).map_err(|e| e.to_string())
 }
@@ -67,7 +60,7 @@ impl OcrProvider {
                     OcrBackend::Api { client: OcrApiClient::Mistral(client) }
                 }
                 Err(e) => {
-                    let reason = format!("Mistral OCR backend unavailable: {}", e);
+                    let reason = format!("Mistral OCR backend unavailable: {e}");
                     warn!("{}", reason);
                     OcrBackend::Unavailable { reason }
                 }
@@ -78,7 +71,7 @@ impl OcrProvider {
                     OcrBackend::Api { client: OcrApiClient::DeepSeek(client) }
                 }
                 Err(e) => {
-                    let reason = format!("DeepSeek OCR backend unavailable: {}", e);
+                    let reason = format!("DeepSeek OCR backend unavailable: {e}");
                     warn!("{}", reason);
                     OcrBackend::Unavailable { reason }
                 }
@@ -89,7 +82,7 @@ impl OcrProvider {
                     OcrBackend::Api { client: OcrApiClient::OpenAi(client) }
                 }
                 Err(e) => {
-                    let reason = format!("OpenAI Vision OCR backend unavailable: {}", e);
+                    let reason = format!("OpenAI Vision OCR backend unavailable: {e}");
                     warn!("{}", reason);
                     OcrBackend::Unavailable { reason }
                 }
@@ -102,7 +95,7 @@ impl OcrProvider {
                     }
                 }
                 Err(e) => {
-                    let reason = format!("Tesseract not available: {}", e);
+                    let reason = format!("Tesseract not available: {e}");
                     warn!("{}", reason);
                     OcrBackend::Unavailable { reason }
                 }
@@ -117,23 +110,6 @@ impl OcrProvider {
 
     pub fn is_available(&self) -> bool {
         !matches!(self.backend, OcrBackend::Unavailable { .. })
-    }
-
-    pub fn unavailable(reason: &str) -> Self {
-        Self {
-            backend: OcrBackend::Unavailable {
-                reason: reason.to_string(),
-            },
-            config: OcrConfig {
-                model: "none".to_string(),
-                api_key: None,
-                base_url: None,
-                languages: "eng".to_string(),
-                timeout_secs: 60,
-                max_image_dimension: 4096,
-                min_image_dimension: 50,
-            },
-        }
     }
 
     pub async fn ocr(&self, image_bytes: &[u8]) -> Result<String> {
@@ -159,22 +135,18 @@ impl OcrProvider {
                 let text = tokio::task::spawn_blocking(move || {
                     let mut lt = tesseract.blocking_lock();
                     lt.set_image_from_mem(&bytes)
-                        .map_err(|e| MomoError::Ocr(format!("Failed to set image: {}", e)))?;
+                        .map_err(|e| MomoError::Ocr(format!("Failed to set image: {e}")))?;
                     lt.get_utf8_text()
-                        .map_err(|e| MomoError::Ocr(format!("Failed to extract text: {}", e)))
+                        .map_err(|e| MomoError::Ocr(format!("Failed to extract text: {e}")))
                 })
                 .await
-                .map_err(|e| MomoError::Ocr(format!("OCR task panicked: {}", e)))??;
+                .map_err(|e| MomoError::Ocr(format!("OCR task panicked: {e}")))??;
 
                 Ok(text.trim().to_string())
             }
             OcrBackend::Api { client } => client.ocr(image_bytes).await,
             OcrBackend::Unavailable { reason } => Err(MomoError::OcrUnavailable(reason.clone())),
         }
-    }
-
-    pub fn config(&self) -> &OcrConfig {
-        &self.config
     }
 }
 
@@ -206,11 +178,6 @@ impl Clone for OcrProvider {
 #[cfg(test)]
 mod tests {
     use super::*;
-
-    #[test]
-    fn test_tesseract_availability_check() {
-        let _ = tesseract_available();
-    }
 
     #[test]
     fn test_ocr_provider_graceful_degradation() {

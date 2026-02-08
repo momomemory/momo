@@ -1,4 +1,3 @@
-use std::collections::HashMap;
 use std::sync::Arc;
 
 use chrono::Utc;
@@ -9,7 +8,8 @@ use wiremock::matchers::{method, path};
 use wiremock::{Mock, MockServer, ResponseTemplate};
 
 use momo::config::{DatabaseConfig, EmbeddingsConfig, InferenceConfig, LlmConfig};
-use momo::db::{Database, DatabaseBackend, LibSqlBackend, MemoryRepository};
+use momo::db::{Database, LibSqlBackend};
+use momo::db::repository::MemoryRepository;
 use momo::embeddings::EmbeddingProvider;
 use momo::intelligence::InferenceEngine;
 use momo::llm::LlmProvider;
@@ -214,8 +214,8 @@ async fn seed_fact_memories(
     let mut ids = Vec::new();
 
     for i in 1..=count {
-        let id = format!("fact_{}", i);
-        let content = format!("Important fact number {} about the user", i);
+        let id = format!("fact_{i}");
+        let content = format!("Important fact number {i} about the user");
         let mem = test_memory(&id, &content, container_tag);
         MemoryRepository::create(&conn, &mem).await.unwrap();
         MemoryRepository::update_embedding(&conn, &id, &embedding)
@@ -308,7 +308,7 @@ async fn inference_e2e_generates_memories() {
     );
 
     // All relations should be Derives type
-    for (_related_id, relation_type) in &inf.memory_relations {
+    for relation_type in inf.memory_relations.values() {
         assert_eq!(
             *relation_type,
             MemoryRelationType::Derives,
@@ -550,8 +550,8 @@ async fn inference_excludes_episodes_from_sources() {
 
     // Create ONLY episode memories (no facts)
     for i in 1..=3 {
-        let id = format!("ep_{}", i);
-        let mem = test_episode_memory(&id, &format!("User had conversation {} about coding", i));
+        let id = format!("ep_{i}");
+        let mem = test_episode_memory(&id, &format!("User had conversation {i} about coding"));
         MemoryRepository::create(&conn, &mem).await.unwrap();
         MemoryRepository::update_embedding(&conn, &id, &embedding)
             .await
@@ -630,11 +630,10 @@ async fn inference_excludes_episodes_from_sources() {
     // Any inferences created should NOT have episode IDs in their relations
     let inferences2 = get_inference_memories(&db).await;
     for inf in &inferences2 {
-        for (related_id, _) in &inf.memory_relations {
+        for related_id in inf.memory_relations.keys() {
             assert!(
                 !related_id.starts_with("ep_"),
-                "Inference should not derive from episode memory (found relation to {})",
-                related_id
+                "Inference should not derive from episode memory (found relation to {related_id})"
             );
         }
     }

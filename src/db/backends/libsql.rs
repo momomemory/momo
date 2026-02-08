@@ -84,21 +84,9 @@ impl DocumentStore for LibSqlBackend {
 
 #[async_trait]
 impl ChunkStore for LibSqlBackend {
-    async fn create_chunk(&self, chunk: &Chunk) -> Result<()> {
-        let conn = self.db.connect()?;
-        ChunkRepository::create(&conn, chunk).await
-    }
     async fn create_chunks_batch(&self, chunks: &[Chunk]) -> Result<()> {
         let conn = self.db.connect()?;
         ChunkRepository::create_batch(&conn, chunks).await
-    }
-    async fn get_chunks_by_document_id(&self, document_id: &str) -> Result<Vec<Chunk>> {
-        let conn = self.db.connect()?;
-        ChunkRepository::get_by_document_id(&conn, document_id).await
-    }
-    async fn update_chunk_embedding(&self, chunk_id: &str, embedding: &[f32]) -> Result<()> {
-        let conn = self.db.connect()?;
-        ChunkRepository::update_embedding(&conn, chunk_id, embedding).await
     }
     async fn update_chunk_embeddings_batch(&self, updates: &[(String, Vec<f32>)]) -> Result<()> {
         let conn = self.db.connect()?;
@@ -111,10 +99,6 @@ impl ChunkStore for LibSqlBackend {
     async fn search_similar_chunks(&self, embedding: &[f32], limit: u32, threshold: f32, container_tags: Option<&[String]>) -> Result<Vec<ChunkWithDocument>> {
         let conn = self.db.connect()?;
         ChunkRepository::search_similar(&conn, embedding, limit, threshold, container_tags).await
-    }
-    async fn search_chunks_with_index(&self, embedding: &[f32], limit: u32, container_tags: Option<&[String]>) -> Result<Vec<ChunkWithDocument>> {
-        let conn = self.db.connect()?;
-        ChunkRepository::search_with_vector_index(&conn, embedding, limit, container_tags).await
     }
     async fn delete_all_chunks(&self) -> Result<u64> {
         let conn = self.db.connect()?;
@@ -148,10 +132,6 @@ impl MemoryStore for LibSqlBackend {
     async fn forget_memory(&self, id: &str, reason: Option<&str>) -> Result<()> {
         let conn = self.db.connect()?;
         MemoryRepository::forget(&conn, id, reason).await
-    }
-    async fn update_memory_last_accessed(&self, id: &str) -> Result<()> {
-        let conn = self.db.connect()?;
-        MemoryRepository::update_last_accessed(&conn, id).await
     }
     async fn update_memory_last_accessed_batch(&self, ids: &[&str]) -> Result<u64> {
         let conn = self.db.connect()?;
@@ -313,22 +293,10 @@ impl MemorySourceStore for LibSqlBackend {
         let conn = self.db.connect()?;
         MemorySourcesRepository::get_by_memory(&conn, memory_id).await
     }
-    async fn get_sources_by_document(&self, document_id: &str) -> Result<Vec<MemorySource>> {
-        let conn = self.db.connect()?;
-        MemorySourcesRepository::get_by_document(&conn, document_id).await
-    }
 }
 
 #[async_trait]
 impl MetadataStore for LibSqlBackend {
-    async fn get_metadata(&self, key: &str) -> Result<Option<String>> {
-        let conn = self.db.connect()?;
-        MetadataRepository::get(&conn, key).await
-    }
-    async fn set_metadata(&self, key: &str, value: &str) -> Result<()> {
-        let conn = self.db.connect()?;
-        MetadataRepository::set(&conn, key, value).await
-    }
     async fn get_embedding_dimensions(&self) -> Result<Option<usize>> {
         let conn = self.db.connect()?;
         MetadataRepository::get_embedding_dimensions(&conn).await
@@ -341,10 +309,6 @@ impl MetadataStore for LibSqlBackend {
 
 #[async_trait]
 impl DatabaseBackend for LibSqlBackend {
-    async fn initialize(&self) -> Result<()> {
-        let conn = self.db.connect()?;
-        crate::db::schema::init_schema(&conn).await
-    }
     async fn sync(&self) -> Result<()> {
         self.db.sync().await
     }
@@ -373,19 +337,6 @@ impl DatabaseBackend for LibSqlBackend {
             Ok(None)
         }
     }
-
-    async fn set_container_filter(&self, tag: &str, filter: &ContainerFilter) -> Result<()> {
-        let conn = self.db.connect()?;
-        let now = chrono::Utc::now().to_rfc3339();
-
-        conn.execute(
-            "UPDATE container_tags SET should_llm_filter = ?2, filter_prompt = ?3, updated_at = ?4 WHERE tag = ?1",
-            params![tag, if filter.should_llm_filter { 1 } else { 0 }, filter.filter_prompt.clone(), now],
-        )
-        .await?;
-
-        Ok(())
-    }
 }
 
 #[cfg(test)]
@@ -404,13 +355,13 @@ mod tests {
         let thread_id = std::thread::current().id();
         
         let config = DatabaseConfig {
-            url: format!("file:/tmp/momo_test_db_{:?}_{}?mode=memory&cache=shared", thread_id, timestamp),
+            url: format!("file:/tmp/momo_test_db_{thread_id:?}_{timestamp}?mode=memory&cache=shared"),
             auth_token: None,
             local_path: None,
         };
         let db = Database::new(&config).await.expect("Failed to create database");
-        let backend = LibSqlBackend::new(db);
-        backend
+        
+        LibSqlBackend::new(db)
     }
 
     #[tokio::test]
@@ -419,118 +370,6 @@ mod tests {
         
         let result = backend.get_container_filter("non_existent_tag").await.unwrap();
         assert!(result.is_none());
-    }
-
-    #[tokio::test]
-    async fn test_set_and_get_container_filter() {
-        let backend = setup_test_db().await;
-        let tag = "test_container";
-
-        let conn = backend.db.connect().unwrap();
-        let now = chrono::Utc::now().to_rfc3339();
-        conn.execute(
-            "INSERT INTO container_tags (tag, metadata, document_count, memory_count, created_at, updated_at) VALUES (?1, '{}', 0, 0, ?2, ?2)",
-            params![tag, now],
-        )
-        .await
-        .unwrap();
-
-        let filter = ContainerFilter {
-            tag: tag.to_string(),
-            should_llm_filter: true,
-            filter_prompt: Some("technical only".to_string()),
-        };
-
-        backend.set_container_filter(tag, &filter).await.unwrap();
-
-        let retrieved = backend.get_container_filter(tag).await.unwrap();
-        assert!(retrieved.is_some());
-        
-        let retrieved = retrieved.unwrap();
-        assert_eq!(retrieved.tag, tag);
-        assert_eq!(retrieved.should_llm_filter, true);
-        assert_eq!(retrieved.filter_prompt, Some("technical only".to_string()));
-    }
-
-    #[tokio::test]
-    async fn test_update_existing_filter() {
-        let backend = setup_test_db().await;
-        let tag = "update_test";
-
-        let conn = backend.db.connect().unwrap();
-        let now = chrono::Utc::now().to_rfc3339();
-        conn.execute(
-            "INSERT INTO container_tags (tag, metadata, document_count, memory_count, should_llm_filter, filter_prompt, created_at, updated_at) VALUES (?1, '{}', 0, 0, 1, 'old prompt', ?2, ?2)",
-            params![tag, now],
-        )
-        .await
-        .unwrap();
-
-        let new_filter = ContainerFilter {
-            tag: tag.to_string(),
-            should_llm_filter: false,
-            filter_prompt: None,
-        };
-
-        backend.set_container_filter(tag, &new_filter).await.unwrap();
-
-        let retrieved = backend.get_container_filter(tag).await.unwrap().unwrap();
-        assert_eq!(retrieved.should_llm_filter, false);
-        assert_eq!(retrieved.filter_prompt, None);
-    }
-
-    #[tokio::test]
-    async fn test_filter_with_llm_enabled() {
-        let backend = setup_test_db().await;
-        let tag = "llm_enabled_test";
-
-        let conn = backend.db.connect().unwrap();
-        let now = chrono::Utc::now().to_rfc3339();
-        conn.execute(
-            "INSERT INTO container_tags (tag, metadata, document_count, memory_count, created_at, updated_at) VALUES (?1, '{}', 0, 0, ?2, ?2)",
-            params![tag, now],
-        )
-        .await
-        .unwrap();
-
-        let filter = ContainerFilter {
-            tag: tag.to_string(),
-            should_llm_filter: true,
-            filter_prompt: Some("Only work-related memories".to_string()),
-        };
-
-        backend.set_container_filter(tag, &filter).await.unwrap();
-
-        let retrieved = backend.get_container_filter(tag).await.unwrap().unwrap();
-        assert!(retrieved.should_llm_filter);
-        assert_eq!(retrieved.filter_prompt, Some("Only work-related memories".to_string()));
-    }
-
-    #[tokio::test]
-    async fn test_filter_with_llm_disabled() {
-        let backend = setup_test_db().await;
-        let tag = "llm_disabled_test";
-
-        let conn = backend.db.connect().unwrap();
-        let now = chrono::Utc::now().to_rfc3339();
-        conn.execute(
-            "INSERT INTO container_tags (tag, metadata, document_count, memory_count, created_at, updated_at) VALUES (?1, '{}', 0, 0, ?2, ?2)",
-            params![tag, now],
-        )
-        .await
-        .unwrap();
-
-        let filter = ContainerFilter {
-            tag: tag.to_string(),
-            should_llm_filter: false,
-            filter_prompt: None,
-        };
-
-        backend.set_container_filter(tag, &filter).await.unwrap();
-
-        let retrieved = backend.get_container_filter(tag).await.unwrap().unwrap();
-        assert!(!retrieved.should_llm_filter);
-        assert!(retrieved.filter_prompt.is_none());
     }
 
     #[tokio::test]

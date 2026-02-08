@@ -23,11 +23,11 @@ pub fn preprocess_image(bytes: &[u8], config: &OcrConfig) -> Result<Vec<u8>> {
     let reader = ImageReader::new(std::io::Cursor::new(bytes));
     let reader = reader
         .with_guessed_format()
-        .map_err(|e| MomoError::Processing(format!("Failed to read image: {}", e)))?;
+        .map_err(|e| MomoError::Processing(format!("Failed to read image: {e}")))?;
 
     let img = reader
         .decode()
-        .map_err(|e| MomoError::Processing(format!("Failed to decode image: {}", e)))?;
+        .map_err(|e| MomoError::Processing(format!("Failed to decode image: {e}")))?;
 
     // 1. Check minimum dimensions
     let (width, height) = img.dimensions();
@@ -56,7 +56,7 @@ pub fn preprocess_image(bytes: &[u8], config: &OcrConfig) -> Result<Vec<u8>> {
     // Encode back to PNG bytes
     let mut output = Vec::new();
     img.write_to(&mut std::io::Cursor::new(&mut output), ImageFormat::Png)
-        .map_err(|e| MomoError::Processing(format!("Failed to encode image: {}", e)))?;
+        .map_err(|e| MomoError::Processing(format!("Failed to encode image: {e}")))?;
 
     Ok(output)
 }
@@ -185,31 +185,6 @@ fn enhance_grayscale_contrast(gray: image::GrayImage) -> image::GrayImage {
     })
 }
 
-/// Verify an image is valid and meets minimum size requirements
-///
-/// Used for quick validation before full preprocessing
-pub fn validate_image(bytes: &[u8], min_dimension: u32) -> Result<(u32, u32)> {
-    let reader = ImageReader::new(std::io::Cursor::new(bytes));
-    let reader = reader
-        .with_guessed_format()
-        .map_err(|e| MomoError::Processing(format!("Failed to read image: {}", e)))?;
-
-    let img = reader
-        .decode()
-        .map_err(|e| MomoError::Processing(format!("Failed to decode image: {}", e)))?;
-
-    let (width, height) = img.dimensions();
-
-    if width < min_dimension || height < min_dimension {
-        return Err(MomoError::Processing(format!(
-            "Image too small: {}x{}, minimum {}x{}",
-            width, height, min_dimension, min_dimension
-        )));
-    }
-
-    Ok((width, height))
-}
-
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -276,13 +251,11 @@ mod tests {
         let err = result.unwrap_err().to_string();
         assert!(
             err.contains("too small"),
-            "Error should indicate image is too small: {}",
-            err
+            "Error should indicate image is too small: {err}"
         );
         assert!(
             err.contains("10x10"),
-            "Error should mention the image dimensions: {}",
-            err
+            "Error should mention the image dimensions: {err}"
         );
     }
 
@@ -460,25 +433,6 @@ mod tests {
     }
 
     #[test]
-    fn test_validate_image_success() {
-        let image = create_test_png(100, 100);
-        let result = validate_image(&image, 50);
-
-        assert!(result.is_ok());
-        let (width, height) = result.unwrap();
-        assert_eq!(width, 100);
-        assert_eq!(height, 100);
-    }
-
-    #[test]
-    fn test_validate_image_too_small() {
-        let image = create_test_png(30, 30);
-        let result = validate_image(&image, 50);
-
-        assert!(result.is_err());
-    }
-
-    #[test]
     fn test_resize_if_needed_no_change() {
         let img = DynamicImage::new_rgb8(500, 500);
         let resized = resize_if_needed(img.clone(), 1000);
@@ -557,7 +511,7 @@ mod tests {
     fn test_enhance_contrast_grayscale() {
         // Create a low-contrast image
         let mut gray = image::GrayImage::new(100, 100);
-        for (x, y, pixel) in gray.enumerate_pixels_mut() {
+        for (x, _y, pixel) in gray.enumerate_pixels_mut() {
             // Create gradient from 50 to 100 (low contrast)
             let val = (50 + (x % 51)) as u8;
             *pixel = image::Luma([val]);

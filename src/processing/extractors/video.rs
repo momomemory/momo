@@ -203,7 +203,7 @@ mod tests {
 
         assert!(result.is_err());
         let err = result.unwrap_err().to_string();
-        assert!(err.contains("Empty"), "Error should mention empty: {}", err);
+        assert!(err.contains("Empty"), "Error should mention empty: {err}");
     }
 
     #[tokio::test]
@@ -218,8 +218,7 @@ mod tests {
         let err = result.unwrap_err().to_string();
         assert!(
             err.contains("unavailable") || err.contains("not available"),
-            "Error should mention unavailable: {}",
-            err
+            "Error should mention unavailable: {err}"
         );
     }
 
@@ -238,8 +237,7 @@ mod tests {
         let err = result.unwrap_err().to_string();
         assert!(
             err.contains("exceeds") || err.contains("size"),
-            "Error should mention size limit: {}",
-            err
+            "Error should mention size limit: {err}"
         );
     }
 
@@ -273,7 +271,7 @@ mod tests {
         assert!(result.is_err());
         let err = result.unwrap_err().to_string();
         let expected = "YouTube URLs are not yet supported. Video transcription requires uploaded files (MP4, WebM, AVI, MKV). See TODO in code for implementation.";
-        assert!(err.contains(expected), "Error should contain expected message: {}", err);
+        assert!(err.contains(expected), "Error should contain expected message: {err}");
     }
 
     #[test]

@@ -56,12 +56,6 @@ pub struct SearchIncludeFlags {
     /// Include individual chunks in document results (default: false).
     #[serde(default)]
     pub chunks: bool,
-    /// Include memory data in results (default: true).
-    #[serde(default = "default_true")]
-    pub memories: bool,
-    /// Include graph context for matched items (default: false).
-    #[serde(default)]
-    pub graph_context: bool,
 }
 
 fn default_true() -> bool {
@@ -73,8 +67,6 @@ impl Default for SearchIncludeFlags {
         Self {
             documents: true,
             chunks: false,
-            memories: true,
-            graph_context: false,
         }
     }
 }

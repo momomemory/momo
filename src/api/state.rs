@@ -3,7 +3,7 @@ use std::sync::Arc;
 use crate::config::Config;
 use crate::db::DatabaseBackend;
 use crate::embeddings::{EmbeddingProvider, RerankerProvider};
-use crate::intelligence::{MemoryExtractor, RelationshipDetector};
+use crate::intelligence::MemoryExtractor;
 use crate::llm::LlmProvider;
 use crate::ocr::OcrProvider;
 use crate::processing::ProcessingPipeline;
@@ -16,14 +16,11 @@ pub struct AppState {
     pub db: Arc<dyn DatabaseBackend>,
     pub embeddings: EmbeddingProvider,
     pub reranker: Option<RerankerProvider>,
-    pub ocr: OcrProvider,
-    pub transcription: TranscriptionProvider,
     pub llm: LlmProvider,
     pub search: SearchService,
     pub memory: MemoryService,
     pub pipeline: ProcessingPipeline,
     pub extractor: MemoryExtractor,
-    pub relationship_detector: RelationshipDetector,
 }
 
 impl AppState {
@@ -49,26 +46,22 @@ impl AppState {
         let pipeline = ProcessingPipeline::new(
             db.clone(),
             embeddings.clone(),
-            ocr.clone(),
-            transcription.clone(),
+            ocr,
+            transcription,
             llm.clone(),
             &config,
         );
-        let relationship_detector = RelationshipDetector::new(llm.clone(), embeddings.clone());
 
         Self {
             config,
             db,
             embeddings,
             reranker,
-            ocr,
-            transcription,
             llm,
             search,
             memory,
             pipeline,
             extractor,
-            relationship_detector,
         }
     }
 }

@@ -152,7 +152,7 @@ fn test_api_client_uses_provider_default_base_url() {
 
     match client {
         Ok(value) => assert_eq!(value.base_url(), "https://openrouter.ai/api/v1"),
-        Err(error) => panic!("Expected API client creation to succeed, got: {}", error),
+        Err(error) => panic!("Expected API client creation to succeed, got: {error}"),
     }
 }
 
@@ -173,7 +173,7 @@ async fn test_complete_returns_response_content() {
 
     match result {
         Ok(value) => assert_eq!(value, "Hello from mock"),
-        Err(error) => panic!("Expected completion to succeed, got: {}", error),
+        Err(error) => panic!("Expected completion to succeed, got: {error}"),
     }
 }
 
@@ -202,7 +202,7 @@ async fn test_retry_on_server_error() {
 
     match result {
         Ok(value) => assert_eq!(value, "Recovered response"),
-        Err(error) => panic!("Expected retry completion to succeed, got: {}", error),
+        Err(error) => panic!("Expected retry completion to succeed, got: {error}"),
     }
     assert_eq!(attempts.load(Ordering::SeqCst), 2);
 }
@@ -257,7 +257,7 @@ async fn test_auth_error_returns_llm_error() {
         Err(MomoError::Llm(message)) => {
             assert!(message.to_lowercase().contains("authentication failed"));
         }
-        other => panic!("Expected Llm auth error, got: {:?}", other),
+        other => panic!("Expected Llm auth error, got: {other:?}"),
     }
 }
 
@@ -272,7 +272,7 @@ async fn test_empty_prompt_validation() {
         Err(MomoError::Validation(message)) => {
             assert!(message.contains("Prompt cannot be empty"));
         }
-        other => panic!("Expected Validation error, got: {:?}", other),
+        other => panic!("Expected Validation error, got: {other:?}"),
     }
 }
 
