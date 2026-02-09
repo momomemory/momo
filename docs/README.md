@@ -17,14 +17,14 @@ The system handles document ingestion, memory extraction, and hybrid search with
 
 - **GitHub Repository**: [https://github.com/momomemory/momo](https://github.com/momomemory/momo)
 - **TypeScript SDK**: [https://github.com/momomemory/sdk-typescript](https://github.com/momomemory/sdk-typescript)
-- **Docker Hub**: [https://hub.docker.com/r/momomemory/momo](https://hub.docker.com/r/momomemory/momo)
+- **Container Image (GHCR)**: [ghcr.io/momomemory/momo:latest](https://ghcr.io/momomemory/momo:latest)
 
 ## Quick Start
 
 Run Momo with Docker:
 
 ```bash
-docker run -p 3000:3000 -v ./data:/data momomemory/momo
+docker run --name momo -d --restart unless-stopped -p 3000:3000 -v momo-data:/data ghcr.io/momomemory/momo:latest
 ```
 
 Add a memory:

@@ -22,7 +22,7 @@ Momo is a self-hostable AI memory system written in Rust — inspired by SuperMe
 The fastest way to get Momo running is via Docker:
 
 ```bash
-docker run -p 3000:3000 -v ./data:/data momomemory/momo
+docker run --name momo -d --restart unless-stopped -p 3000:3000 -v momo-data:/data ghcr.io/momomemory/momo:latest
 ```
 
 ### Add a Memory
@@ -74,11 +74,16 @@ For detailed documentation, see the [docs](./docs/README.md) directory.
 
 ## Docker
 
-To build and run the Docker image locally:
+Use the published container image:
 
 ```bash
-docker build -t momo .
-docker run -p 3000:3000 -v ./data:/data momo
+docker run --name momo -d --restart unless-stopped -p 3000:3000 -v momo-data:/data ghcr.io/momomemory/momo:latest
+```
+
+To follow logs:
+
+```bash
+docker logs -f momo
 ```
 
 ## Development

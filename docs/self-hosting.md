@@ -102,18 +102,30 @@ The compiled binary will be located at `./target/release/momo`.
 
 ### Docker
 
-Momo is available as a pre-built image on Docker Hub.
+Momo is available as a pre-built image on GitHub Container Registry (GHCR).
 
 ```bash
-# Pull and run from Docker Hub
-docker run -p 3000:3000 -v ./data:/data momomemory/momo
-
-# Or build locally
-docker build -t momo .
-docker run -p 3000:3000 -v ./data:/data momo
+# One-command setup (recommended)
+docker run --name momo -d --restart unless-stopped -p 3000:3000 -v momo-data:/data ghcr.io/momomemory/momo:latest
 ```
 
-**Note:** The `/data` volume is used to persist the SQLite database.
+```bash
+# Follow logs
+docker logs -f momo
+```
+
+```bash
+# Stop and remove container (data remains in momo-data volume)
+docker stop momo && docker rm momo
+```
+
+```bash
+# Optional: build locally instead of using GHCR
+docker build -t momo .
+docker run --name momo -d --restart unless-stopped -p 3000:3000 -v momo-data:/data momo
+```
+
+**Note:** The `/data` volume stores the database. Using the named volume `momo-data` keeps data across container restarts/redeploys.
 
 ---
 
