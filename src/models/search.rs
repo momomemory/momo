@@ -497,6 +497,7 @@ pub struct HybridSearchResult {
 /// either a DocumentSearchResult or MemorySearchResult.
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(untagged)]
+#[allow(dead_code)]
 pub enum HybridSearchResultVariant {
     Document(DocumentSearchResult),
     Memory(MemorySearchResult),

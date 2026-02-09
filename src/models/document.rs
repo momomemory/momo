@@ -55,6 +55,7 @@ impl Document {
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, Validate)]
+#[allow(dead_code)]
 pub struct CreateDocumentRequest {
     #[validate(length(min = 1, max = 10_000_000))]
     pub content: String,
@@ -78,6 +79,7 @@ pub struct CreateDocumentRequest {
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, Validate)]
+#[allow(dead_code)]
 pub struct BatchCreateDocumentRequest {
     #[validate(length(min = 1, max = 600))]
     pub documents: Vec<BatchDocumentItem>,
@@ -86,6 +88,7 @@ pub struct BatchCreateDocumentRequest {
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, Validate)]
+#[allow(dead_code)]
 pub struct BatchDocumentItem {
     #[validate(length(min = 1))]
     pub content: String,
@@ -98,12 +101,14 @@ pub struct BatchDocumentItem {
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
+#[allow(dead_code)]
 pub struct CreateDocumentResponse {
     pub id: String,
     pub status: ProcessingStatus,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
+#[allow(dead_code)]
 pub struct UpdateDocumentRequest {
     pub title: Option<String>,
     pub metadata: Option<Metadata>,
@@ -121,12 +126,14 @@ pub struct ListDocumentsRequest {
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
+#[allow(dead_code)]
 pub struct ListDocumentsResponse {
     pub documents: Vec<DocumentSummary>,
     pub pagination: super::Pagination,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
+#[allow(dead_code)]
 pub struct BatchCreateDocumentResponse {
     pub documents: Vec<CreateDocumentResponse>,
 }

@@ -138,6 +138,7 @@ pub struct MemoryRelationInfo {
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
+#[allow(dead_code)]
 pub struct ConversationRequest {
     pub messages: Vec<ConversationMessage>,
     pub container_tag: String,
