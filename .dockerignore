@@ -1,7 +1,0 @@
-.git
-.github
-target
-tmp
-.env
-.env.*
-*.log

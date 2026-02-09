@@ -1,8 +1,7 @@
-# syntax=docker/dockerfile:1.7
-
-FROM rust:1-bookworm AS chef
+FROM rust:1-bookworm AS builder
 
 WORKDIR /app
+COPY . .
 
 RUN apt-get update && \
     apt-get install -y --no-install-recommends \
@@ -14,23 +13,7 @@ RUN apt-get update && \
       libtesseract-dev && \
     rm -rf /var/lib/apt/lists/*
 
-RUN cargo install cargo-chef --locked
-
-FROM chef AS planner
-COPY . .
-RUN cargo chef prepare --recipe-path recipe.json
-
-FROM chef AS builder
-COPY --from=planner /app/recipe.json recipe.json
-RUN --mount=type=cache,target=/usr/local/cargo/registry,sharing=locked \
-    --mount=type=cache,target=/app/target,sharing=locked \
-    cargo chef cook --release --recipe-path recipe.json
-
-COPY . .
-
-RUN --mount=type=cache,target=/usr/local/cargo/registry,sharing=locked \
-    --mount=type=cache,target=/app/target,sharing=locked \
-    cargo build --release
+RUN cargo build --release
 
 FROM debian:bookworm-slim
 
