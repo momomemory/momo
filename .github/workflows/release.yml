@@ -262,6 +262,7 @@ jobs:
         uses: actions/download-artifact@v4
         with:
           path: artifacts
+          pattern: momo-*.tar.gz
           merge-multiple: true
 
       - name: Generate combined checksums
