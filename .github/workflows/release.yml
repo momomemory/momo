@@ -57,6 +57,8 @@ jobs:
         id: version
         shell: bash
         run: |
+          CARGO_VERSION=$(sed -nE 's/^version\s*=\s*"([^"]+)"/\1/p' Cargo.toml | head -1)
+
           # Resolve version from tag, dispatch input, or Cargo.toml
           if [[ "${{ github.event_name }}" == "push" ]]; then
             TAG="${GITHUB_REF#refs/tags/}"
@@ -68,8 +70,8 @@ jobs:
             TAG="v${VERSION}"
             DRY_RUN="${{ inputs.dry_run }}"
           else
-            VERSION=$(grep -E '^version\s*=' Cargo.toml | head -1 | grep -oP '"\K[^"]+' || true)
-            if [[ -z "$VERSION" || "$VERSION" == *"workspace"* ]]; then
+            VERSION="${CARGO_VERSION}"
+            if [[ -z "$VERSION" ]]; then
               echo "::error::Could not determine version from Cargo.toml. Provide version input."
               exit 1
             fi
@@ -98,10 +100,11 @@ jobs:
       - name: Validate version matches Cargo.toml
         shell: bash
         run: |
-          CARGO_VERSION=$(grep -E '^version\s*=' Cargo.toml | head -1 | grep -oP '"\K[^"]+' || true)
+          CARGO_VERSION=$(sed -nE 's/^version\s*=\s*"([^"]+)"/\1/p' Cargo.toml | head -1)
           RELEASE_VERSION="${{ steps.version.outputs.version }}"
           if [[ -z "$CARGO_VERSION" ]]; then
-            echo "::warning::Could not extract version from Cargo.toml (workspace-inherited). Skipping validation."
+            echo "::error::Could not extract version from Cargo.toml"
+            exit 1
           elif [[ "$CARGO_VERSION" != "$RELEASE_VERSION" ]]; then
             echo "::error::Version mismatch: Cargo.toml has ${CARGO_VERSION} but release is ${RELEASE_VERSION}"
             exit 1
