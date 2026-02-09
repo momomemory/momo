@@ -8,6 +8,7 @@ pub struct StructuredDataChunker {
 
 impl StructuredDataChunker {
     /// Create a new chunker with specified rows per chunk
+    #[allow(dead_code)]
     pub fn new(rows_per_chunk: usize) -> Self {
         Self { rows_per_chunk }
     }
@@ -43,7 +44,7 @@ impl ContentChunker for StructuredDataChunker {
 
         let mut chunks = Vec::new();
 
-        for (chunk_index, chunk_rows) in data_rows.chunks(self.rows_per_chunk).enumerate() {
+        for chunk_rows in data_rows.chunks(self.rows_per_chunk) {
             let mut chunk_content = String::new();
             chunk_content.push_str(header);
             chunk_content.push('\n');

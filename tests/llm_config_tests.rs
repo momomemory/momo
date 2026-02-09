@@ -1,8 +1,13 @@
 use axum::{http::StatusCode, response::IntoResponse};
 use std::env;
+use std::sync::Mutex;
 
 use momo::config::{parse_llm_provider_model, Config, LlmConfig, KNOWN_LLM_PROVIDERS};
 use momo::error::MomoError;
+
+/// Mutex to serialize tests that mutate LLM_MODEL and related env vars,
+/// preventing races when the test binary runs with multiple threads.
+static ENV_MUTEX: Mutex<()> = Mutex::new(());
 
 #[test]
 fn test_llm_config_openai() {
@@ -50,6 +55,7 @@ fn test_known_llm_providers_constant() {
 
 #[test]
 fn test_llm_config_none_when_no_env() {
+    let _guard = ENV_MUTEX.lock().unwrap();
     env::remove_var("LLM_MODEL");
 
     let config = Config::default();
@@ -62,6 +68,7 @@ fn test_llm_config_none_when_no_env() {
 
 #[test]
 fn test_llm_config_some_when_model_env_set() {
+    let _guard = ENV_MUTEX.lock().unwrap();
     env::set_var("LLM_MODEL", "openai/gpt-4o-mini");
     env::remove_var("LLM_API_KEY");
     env::remove_var("LLM_BASE_URL");
@@ -87,6 +94,7 @@ fn test_llm_config_some_when_model_env_set() {
 
 #[test]
 fn test_llm_config_with_all_env_vars() {
+    let _guard = ENV_MUTEX.lock().unwrap();
     env::set_var("LLM_MODEL", "openrouter/anthropic/claude-3.5-sonnet");
     env::set_var("LLM_API_KEY", "sk-test-key");
     env::set_var("LLM_BASE_URL", "https://api.custom.com/v1");
@@ -152,7 +160,6 @@ fn test_llm_config_clone() {
         query_rewrite_timeout_secs: 2,
         enable_auto_relations: true,
         enable_contradiction_detection: false,
-        enable_llm_filter: false,
         filter_prompt: None,
     };
 

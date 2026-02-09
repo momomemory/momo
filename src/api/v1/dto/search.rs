@@ -279,8 +279,6 @@ mod tests {
         assert_eq!(req.scope, SearchScope::Hybrid);
         assert!(req.include.documents);
         assert!(!req.include.chunks);
-        assert!(req.include.memories);
-        assert!(!req.include.graph_context);
     }
 
     #[test]

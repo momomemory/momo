@@ -150,6 +150,7 @@ Respond with only the rewritten query, no explanation."#
 /// let prompt = summarize_prompt("Long article text...", 50);
 /// assert!(prompt.contains("50 words"));
 /// ```
+#[allow(dead_code)]
 pub fn summarize_prompt(content: &str, max_length: usize) -> String {
     format!(
         r#"Summarize the following content in {max_length} words or less.

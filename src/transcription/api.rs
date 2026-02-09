@@ -57,7 +57,11 @@ impl TranscriptionApiClient {
         })
     }
 
-    pub async fn transcribe(&self, audio_bytes: &[u8], file_extension: Option<&str>) -> Result<String> {
+    pub async fn transcribe(
+        &self,
+        audio_bytes: &[u8],
+        file_extension: Option<&str>,
+    ) -> Result<String> {
         let mut last_error: Option<MomoError> = None;
         let max_retries = 3; // Default max retries
 
@@ -84,7 +88,11 @@ impl TranscriptionApiClient {
                     }
 
                     if attempt < max_retries {
-                        warn!("Transcription attempt {} failed (retryable): {}", attempt + 1, e);
+                        warn!(
+                            "Transcription attempt {} failed (retryable): {}",
+                            attempt + 1,
+                            e
+                        );
                         last_error = Some(e);
                         continue;
                     }
@@ -99,7 +107,11 @@ impl TranscriptionApiClient {
         }))
     }
 
-    async fn transcribe_internal(&self, audio_bytes: &[u8], file_extension: Option<&str>) -> Result<String> {
+    async fn transcribe_internal(
+        &self,
+        audio_bytes: &[u8],
+        file_extension: Option<&str>,
+    ) -> Result<String> {
         // Build multipart form
         let file_name = format!("audio.{}", file_extension.unwrap_or("mp3"));
         let mime_type = self.infer_mime_type(file_extension);
@@ -115,11 +127,7 @@ impl TranscriptionApiClient {
             .text("response_format", "json");
 
         // Build request
-        let base_url = self
-            .config
-            .base_url
-            .as_deref()
-            .unwrap_or(OPENAI_BASE_URL);
+        let base_url = self.config.base_url.as_deref().unwrap_or(OPENAI_BASE_URL);
         let url = format!("{base_url}/audio/transcriptions");
 
         let api_key = self
@@ -329,15 +337,13 @@ mod tests {
 
         Mock::given(method("POST"))
             .and(path("/audio/transcriptions"))
-            .respond_with(
-                ResponseTemplate::new(401).set_body_json(serde_json::json!({
-                    "error": {
-                        "message": "Invalid API key",
-                        "type": "invalid_request_error",
-                        "code": "invalid_api_key"
-                    }
-                })),
-            )
+            .respond_with(ResponseTemplate::new(401).set_body_json(serde_json::json!({
+                "error": {
+                    "message": "Invalid API key",
+                    "type": "invalid_request_error",
+                    "code": "invalid_api_key"
+                }
+            })))
             .mount(&mock_server)
             .await;
 
@@ -360,14 +366,12 @@ mod tests {
 
         Mock::given(method("POST"))
             .and(path("/audio/transcriptions"))
-            .respond_with(
-                ResponseTemplate::new(429).set_body_json(serde_json::json!({
-                    "error": {
-                        "message": "Rate limit exceeded",
-                        "type": "rate_limit_error"
-                    }
-                })),
-            )
+            .respond_with(ResponseTemplate::new(429).set_body_json(serde_json::json!({
+                "error": {
+                    "message": "Rate limit exceeded",
+                    "type": "rate_limit_error"
+                }
+            })))
             .mount(&mock_server)
             .await;
 
@@ -390,14 +394,12 @@ mod tests {
 
         Mock::given(method("POST"))
             .and(path("/audio/transcriptions"))
-            .respond_with(
-                ResponseTemplate::new(500).set_body_json(serde_json::json!({
-                    "error": {
-                        "message": "Internal server error",
-                        "type": "server_error"
-                    }
-                })),
-            )
+            .respond_with(ResponseTemplate::new(500).set_body_json(serde_json::json!({
+                "error": {
+                    "message": "Internal server error",
+                    "type": "server_error"
+                }
+            })))
             .mount(&mock_server)
             .await;
 

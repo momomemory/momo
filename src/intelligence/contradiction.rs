@@ -24,6 +24,7 @@ impl std::fmt::Display for ContradictionCheckResult {
 }
 
 impl ContradictionCheckResult {
+    #[allow(dead_code)]
     pub fn is_contradiction(&self) -> bool {
         matches!(self, Self::Likely)
     }
@@ -407,11 +408,6 @@ fn strip_negation(s: &str, negation: &str) -> String {
         .collect::<Vec<_>>()
         .join(" ")
 }
-
-/// Compute a simple word-overlap score between two strings (Jaccard-like).
-///
-/// Returns a value between 0.0 (no overlap) and 1.0 (identical word sets).
-// Moved overlap helpers to src/intelligence/utils.rs
 
 /// Returns true if all significant words in `subset` appear in `superset`.
 fn is_word_subset(subset: &str, superset: &str) -> bool {

@@ -36,9 +36,11 @@ pub enum MomoError {
     UrlParse(#[from] url::ParseError),
 
     #[error("API rate limit exceeded, retry after {retry_after:?} seconds")]
+    #[allow(dead_code)] // Used in EmbeddingApiClient; matched in response.rs
     ApiRateLimit { retry_after: Option<u64> },
 
     #[error("API authentication error: {0}")]
+    #[allow(dead_code)] // Used in EmbeddingApiClient; matched in response.rs
     ApiAuth(String),
 
     #[error("Internal server error: {0}")]

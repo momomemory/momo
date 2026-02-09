@@ -162,10 +162,7 @@ pub async fn batch_create_documents(
     axum::Json(req): axum::Json<BatchCreateDocumentRequest>,
 ) -> ApiResponse<BatchCreateDocumentResponse> {
     if req.documents.is_empty() {
-        return ApiResponse::error(
-            ErrorCode::InvalidRequest,
-            "Documents array cannot be empty",
-        );
+        return ApiResponse::error(ErrorCode::InvalidRequest, "Documents array cannot be empty");
     }
 
     if req.documents.len() > MAX_BATCH_SIZE {
@@ -364,10 +361,7 @@ pub async fn upload_document(
     let content_b64 = base64::engine::general_purpose::STANDARD.encode(&bytes);
 
     let mut doc_metadata = metadata.unwrap_or_default();
-    doc_metadata.insert(
-        "extract_memories".to_string(),
-        serde_json::json!(false),
-    );
+    doc_metadata.insert("extract_memories".to_string(), serde_json::json!(false));
 
     let doc = Document {
         id: id.clone(),
@@ -437,10 +431,7 @@ pub async fn get_document(
     // Fallback: try custom_id
     match state.db.get_document_by_custom_id(&id).await {
         Ok(Some(doc)) => ApiResponse::success(doc.into()),
-        Ok(None) => ApiResponse::error(
-            ErrorCode::NotFound,
-            format!("Document {id} not found"),
-        ),
+        Ok(None) => ApiResponse::error(ErrorCode::NotFound, format!("Document {id} not found")),
         Err(e) => e.into(),
     }
 }
@@ -468,10 +459,7 @@ pub async fn update_document(
     let mut doc = match state.db.get_document_by_id(&id).await {
         Ok(Some(doc)) => doc,
         Ok(None) => {
-            return ApiResponse::error(
-                ErrorCode::NotFound,
-                format!("Document {id} not found"),
-            )
+            return ApiResponse::error(ErrorCode::NotFound, format!("Document {id} not found"))
         }
         Err(e) => return e.into(),
     };
@@ -523,10 +511,7 @@ pub async fn delete_document(
     // Fallback: try custom_id
     match state.db.delete_document_by_custom_id(&id).await {
         Ok(true) => ApiResponse::success(serde_json::json!({ "deleted": true })),
-        Ok(false) => ApiResponse::error(
-            ErrorCode::NotFound,
-            format!("Document {id} not found"),
-        ),
+        Ok(false) => ApiResponse::error(ErrorCode::NotFound, format!("Document {id} not found")),
         Err(e) => e.into(),
     }
 }
@@ -587,10 +572,7 @@ pub async fn list_documents(
         total: Some(pagination.total_items as u64),
     };
 
-    ApiResponse::success_with_meta(
-        ListDocumentsResponse { documents: docs },
-        meta,
-    )
+    ApiResponse::success_with_meta(ListDocumentsResponse { documents: docs }, meta)
 }
 
 /// `GET /api/v1/ingestions/{ingestionId}`

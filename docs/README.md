@@ -1,6 +1,6 @@
 # Momo Documentation
 
-> *"You, my friend, are just a few plumbs short of a fruit pie."* — Momo
+> _"You, my friend, are just a few plumbs short of a fruit pie."_ — Momo
 
 Momo is a self-hostable AI memory system designed to give agents long-term persistent memory. It is a single Rust binary that uses LibSQL's native vector search, meaning no external vector database like Pinecone or Weaviate is required.
 
@@ -8,10 +8,10 @@ The system handles document ingestion, memory extraction, and hybrid search with
 
 ## Documentation
 
-| Guide | Description |
-|-------|-------------|
-| [API Reference](./api.md) | REST API v1 reference, all endpoints, and request/response formats. |
-| [Self-Hosting Guide](./self-hosting.md) | Installation, configuration, and deployment instructions. |
+| Guide                                   | Description                                                         |
+| --------------------------------------- | ------------------------------------------------------------------- |
+| [API Reference](./api.md)               | REST API v1 reference, all endpoints, and request/response formats. |
+| [Self-Hosting Guide](./self-hosting.md) | Installation, configuration, and deployment instructions.           |
 
 ## Quick Links
 

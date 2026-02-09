@@ -23,9 +23,9 @@ impl EmbeddingProvider {
         let (provider, model_name) = parse_provider_model(&config.model);
 
         if provider != "local" {
-            return Err(MomoError::Embedding(
-                format!("Unsupported embedding provider: {}. Local embeddings only.", provider)
-            ));
+            return Err(MomoError::Embedding(format!(
+                "Unsupported embedding provider: {provider}. Local embeddings only.",
+            )));
         }
 
         Self::new_local(config, model_name)

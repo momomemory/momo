@@ -3,7 +3,6 @@ use momo::config::{Config, LlmConfig};
 use momo::db::{Database, DatabaseBackend, LibSqlBackend};
 use momo::embeddings::EmbeddingProvider;
 use momo::llm::LlmProvider;
-use momo::models::SearchDocumentsResponse;
 use momo::ocr::OcrProvider;
 use momo::transcription::TranscriptionProvider;
 use serde_json::json;
@@ -20,6 +19,7 @@ async fn setup_test_app(llm_enabled: bool) -> (SocketAddr, TempDir) {
     config.database.url = db_url;
     config.embeddings.model = "local/BAAI/bge-small-en-v1.5".to_string();
     config.embeddings.dimensions = 384;
+    config.server.api_keys = vec!["test-key".to_string()];
 
     // Configure LLM for query rewriting
     if llm_enabled {
@@ -34,7 +34,6 @@ async fn setup_test_app(llm_enabled: bool) -> (SocketAddr, TempDir) {
             query_rewrite_cache_size: 100,
             enable_auto_relations: false,
             enable_contradiction_detection: false,
-            enable_llm_filter: false,
             filter_prompt: None,
         });
     } else {
@@ -78,7 +77,7 @@ async fn setup_test_app(llm_enabled: bool) -> (SocketAddr, TempDir) {
     (addr, temp_dir)
 }
 
-/// Test 1: Query rewrite disabled by default (no LLM config)
+/// Test 1: Search works without LLM (query rewrite disabled)
 #[tokio::test]
 async fn test_rewrite_disabled_by_default() {
     let (addr, _temp_dir) = setup_test_app(false).await;
@@ -87,10 +86,11 @@ async fn test_rewrite_disabled_by_default() {
 
     // Add a test document
     let doc_res = client
-        .post(format!("{base_url}/v3/documents"))
+        .post(format!("{base_url}/api/v1/documents"))
+        .header("Authorization", "Bearer test-key")
         .json(&json!({
             "content": "Rust is a systems programming language focused on safety and performance.",
-            "container_tag": "test_tag",
+            "containerTag": "test_tag",
             "metadata": {"category": "tech"}
         }))
         .send()
@@ -103,25 +103,25 @@ async fn test_rewrite_disabled_by_default() {
 
     // Search without rewrite flag
     let search_res = client
-        .post(format!("{base_url}/v3/search"))
+        .post(format!("{base_url}/api/v1/search"))
+        .header("Authorization", "Bearer test-key")
         .json(&json!({
             "q": "rust programming",
-            "container_tags": ["test_tag"]
+            "containerTags": ["test_tag"],
+            "scope": "documents"
         }))
         .send()
         .await
         .expect("Failed to send request");
 
     assert!(search_res.status().is_success());
-    let response: SearchDocumentsResponse = search_res.json().await.expect("Failed to parse JSON");
+    let body: serde_json::Value = search_res.json().await.expect("Failed to parse JSON");
 
-    assert!(
-        response.rewritten_query.is_none(),
-        "rewritten_query should be None when rewrite is disabled"
-    );
+    // v1 does not expose rewritten_query
+    assert!(body["data"]["results"].is_array());
 }
 
-/// Test 2: Query rewrite enabled with flag returns rewritten_query
+/// Test 2: Search works with LLM configured (graceful fallback when LLM unavailable)
 #[tokio::test]
 async fn test_rewrite_enabled_with_flag() {
     let (addr, _temp_dir) = setup_test_app(true).await;
@@ -130,10 +130,11 @@ async fn test_rewrite_enabled_with_flag() {
 
     // Add test document
     let doc_res = client
-        .post(format!("{base_url}/v3/documents"))
+        .post(format!("{base_url}/api/v1/documents"))
+        .header("Authorization", "Bearer test-key")
         .json(&json!({
             "content": "Machine learning algorithms for image classification.",
-            "container_tag": "ml_tag"
+            "containerTag": "ml_tag"
         }))
         .send()
         .await
@@ -143,25 +144,25 @@ async fn test_rewrite_enabled_with_flag() {
 
     tokio::time::sleep(tokio::time::Duration::from_secs(1)).await;
 
-    // Search with rewrite_query=true - will fail gracefully if LLM unavailable
+    // Search - v1 doesn't have rewrite_query param, search should still work
     let search_res = client
-        .post(format!("{base_url}/v3/search"))
+        .post(format!("{base_url}/api/v1/search"))
+        .header("Authorization", "Bearer test-key")
         .json(&json!({
             "q": "how to train ML models",
-            "container_tags": ["ml_tag"],
-            "rewrite_query": true
+            "containerTags": ["ml_tag"],
+            "scope": "documents"
         }))
         .send()
         .await
         .expect("Failed to send request");
 
     assert!(search_res.status().is_success());
-    let response: SearchDocumentsResponse = search_res.json().await.expect("Failed to parse JSON");
-
-    assert!(response.rewritten_query.is_none() || response.rewritten_query.is_some());
+    let body: serde_json::Value = search_res.json().await.expect("Failed to parse JSON");
+    assert!(body["data"]["results"].is_array());
 }
 
-/// Test 3: Query rewrite flag false skips rewrite even when enabled
+/// Test 3: Search works with LLM configured but query rewrite not requested
 #[tokio::test]
 async fn test_rewrite_flag_false_skips_rewrite() {
     let (addr, _temp_dir) = setup_test_app(true).await;
@@ -169,10 +170,11 @@ async fn test_rewrite_flag_false_skips_rewrite() {
     let base_url = format!("http://{addr}");
 
     let doc_res = client
-        .post(format!("{base_url}/v3/documents"))
+        .post(format!("{base_url}/api/v1/documents"))
+        .header("Authorization", "Bearer test-key")
         .json(&json!({
             "content": "Deep learning neural networks and architectures.",
-            "container_tag": "dl_tag"
+            "containerTag": "dl_tag"
         }))
         .send()
         .await
@@ -182,25 +184,21 @@ async fn test_rewrite_flag_false_skips_rewrite() {
 
     tokio::time::sleep(tokio::time::Duration::from_secs(1)).await;
 
-    // Explicitly set rewrite_query=false
     let search_res = client
-        .post(format!("{base_url}/v3/search"))
+        .post(format!("{base_url}/api/v1/search"))
+        .header("Authorization", "Bearer test-key")
         .json(&json!({
             "q": "neural network architectures",
-            "container_tags": ["dl_tag"],
-            "rewrite_query": false
+            "containerTags": ["dl_tag"],
+            "scope": "documents"
         }))
         .send()
         .await
         .expect("Failed to send request");
 
     assert!(search_res.status().is_success());
-    let response: SearchDocumentsResponse = search_res.json().await.expect("Failed to parse JSON");
-
-    assert!(
-        response.rewritten_query.is_none(),
-        "rewritten_query should be None when rewrite_query=false"
-    );
+    let body: serde_json::Value = search_res.json().await.expect("Failed to parse JSON");
+    assert!(body["data"]["results"].is_array());
 }
 
 /// Test 4: LLM unavailable gracefully skips rewrite
@@ -212,10 +210,11 @@ async fn test_llm_unavailable_graceful_fallback() {
     let base_url = format!("http://{addr}");
 
     let doc_res = client
-        .post(format!("{base_url}/v3/documents"))
+        .post(format!("{base_url}/api/v1/documents"))
+        .header("Authorization", "Bearer test-key")
         .json(&json!({
             "content": "Natural language processing techniques for sentiment analysis.",
-            "container_tag": "nlp_tag"
+            "containerTag": "nlp_tag"
         }))
         .send()
         .await
@@ -225,28 +224,26 @@ async fn test_llm_unavailable_graceful_fallback() {
 
     tokio::time::sleep(tokio::time::Duration::from_secs(1)).await;
 
-    // Search with rewrite_query=true - should fallback gracefully
+    // Search should succeed even if LLM is unreachable
     let search_res = client
-        .post(format!("{base_url}/v3/search"))
+        .post(format!("{base_url}/api/v1/search"))
+        .header("Authorization", "Bearer test-key")
         .json(&json!({
             "q": "sentiment analysis methods",
-            "container_tags": ["nlp_tag"],
-            "rewrite_query": true
+            "containerTags": ["nlp_tag"],
+            "scope": "documents"
         }))
         .send()
         .await
         .expect("Failed to send request");
 
     assert!(search_res.status().is_success());
-    let response: SearchDocumentsResponse = search_res.json().await.expect("Failed to parse JSON");
+    let body: serde_json::Value = search_res.json().await.expect("Failed to parse JSON");
 
     // Should return results even if rewrite failed
-    assert!(
-        response.rewritten_query.is_none(),
-        "rewritten_query should be None when LLM unavailable"
-    );
-    // But search should still work
-    assert!(response.timing > 0);
+    assert!(body["data"]["results"].is_array());
+    // timingMs should be positive
+    assert!(body["data"]["timingMs"].as_u64().unwrap_or(0) > 0);
 }
 
 /// Test 5: Timeout fallback works
@@ -257,10 +254,11 @@ async fn test_timeout_fallback() {
     let base_url = format!("http://{addr}");
 
     let doc_res = client
-        .post(format!("{base_url}/v3/documents"))
+        .post(format!("{base_url}/api/v1/documents"))
+        .header("Authorization", "Bearer test-key")
         .json(&json!({
             "content": "Computer vision object detection models.",
-            "container_tag": "cv_tag"
+            "containerTag": "cv_tag"
         }))
         .send()
         .await
@@ -270,29 +268,31 @@ async fn test_timeout_fallback() {
 
     tokio::time::sleep(tokio::time::Duration::from_secs(1)).await;
 
-    // Request with rewrite - will timeout if LLM is slow/unavailable
+    // Search should complete within reasonable time even if LLM times out
     let search_res = client
-        .post(format!("{base_url}/v3/search"))
+        .post(format!("{base_url}/api/v1/search"))
+        .header("Authorization", "Bearer test-key")
         .json(&json!({
             "q": "object detection algorithms",
-            "container_tags": ["cv_tag"],
-            "rewrite_query": true
+            "containerTags": ["cv_tag"],
+            "scope": "documents"
         }))
         .send()
         .await
         .expect("Failed to send request");
 
     assert!(search_res.status().is_success());
-    let response: SearchDocumentsResponse = search_res.json().await.expect("Failed to parse JSON");
+    let body: serde_json::Value = search_res.json().await.expect("Failed to parse JSON");
 
     // Should complete within reasonable time even if LLM times out
+    let timing = body["data"]["timingMs"].as_u64().unwrap_or(0);
     assert!(
-        response.timing < 10000,
+        timing < 10000,
         "Search should complete quickly even with timeout"
     );
 }
 
-/// Test 6: Short query skipped (query eligibility check)
+/// Test 6: Short query is handled correctly
 #[tokio::test]
 async fn test_short_query_skipped() {
     let (addr, _temp_dir) = setup_test_app(true).await;
@@ -300,10 +300,11 @@ async fn test_short_query_skipped() {
     let base_url = format!("http://{addr}");
 
     let doc_res = client
-        .post(format!("{base_url}/v3/documents"))
+        .post(format!("{base_url}/api/v1/documents"))
+        .header("Authorization", "Bearer test-key")
         .json(&json!({
             "content": "Kubernetes container orchestration platform.",
-            "container_tag": "k8s_tag"
+            "containerTag": "k8s_tag"
         }))
         .send()
         .await
@@ -313,28 +314,25 @@ async fn test_short_query_skipped() {
 
     tokio::time::sleep(tokio::time::Duration::from_secs(1)).await;
 
-    // Very short query (< 3 chars) should be skipped
+    // Very short query should still succeed
     let search_res = client
-        .post(format!("{base_url}/v3/search"))
+        .post(format!("{base_url}/api/v1/search"))
+        .header("Authorization", "Bearer test-key")
         .json(&json!({
             "q": "k8",
-            "container_tags": ["k8s_tag"],
-            "rewrite_query": true
+            "containerTags": ["k8s_tag"],
+            "scope": "documents"
         }))
         .send()
         .await
         .expect("Failed to send request");
 
     assert!(search_res.status().is_success());
-    let response: SearchDocumentsResponse = search_res.json().await.expect("Failed to parse JSON");
-
-    assert!(
-        response.rewritten_query.is_none(),
-        "Short queries should not be rewritten"
-    );
+    let body: serde_json::Value = search_res.json().await.expect("Failed to parse JSON");
+    assert!(body["data"]["results"].is_array());
 }
 
-/// Test 7: Long query skipped (query eligibility check)
+/// Test 7: Long query is handled correctly
 #[tokio::test]
 async fn test_long_query_skipped() {
     let (addr, _temp_dir) = setup_test_app(true).await;
@@ -342,10 +340,11 @@ async fn test_long_query_skipped() {
     let base_url = format!("http://{addr}");
 
     let doc_res = client
-        .post(format!("{base_url}/v3/documents"))
+        .post(format!("{base_url}/api/v1/documents"))
+        .header("Authorization", "Bearer test-key")
         .json(&json!({
             "content": "Distributed systems consensus algorithms.",
-            "container_tag": "dist_tag"
+            "containerTag": "dist_tag"
         }))
         .send()
         .await
@@ -355,29 +354,26 @@ async fn test_long_query_skipped() {
 
     tokio::time::sleep(tokio::time::Duration::from_secs(1)).await;
 
-    // Very long query (> 500 chars) should be skipped
+    // Very long query should still succeed
     let long_query = "a".repeat(501);
     let search_res = client
-        .post(format!("{base_url}/v3/search"))
+        .post(format!("{base_url}/api/v1/search"))
+        .header("Authorization", "Bearer test-key")
         .json(&json!({
             "q": long_query,
-            "container_tags": ["dist_tag"],
-            "rewrite_query": true
+            "containerTags": ["dist_tag"],
+            "scope": "documents"
         }))
         .send()
         .await
         .expect("Failed to send request");
 
     assert!(search_res.status().is_success());
-    let response: SearchDocumentsResponse = search_res.json().await.expect("Failed to parse JSON");
-
-    assert!(
-        response.rewritten_query.is_none(),
-        "Long queries should not be rewritten"
-    );
+    let body: serde_json::Value = search_res.json().await.expect("Failed to parse JSON");
+    assert!(body["data"]["results"].is_array());
 }
 
-/// Test 8: Memory search with query rewrite
+/// Test 8: Memory search works without rewrite
 #[tokio::test]
 async fn test_memory_search_rewrite() {
     let (addr, _temp_dir) = setup_test_app(false).await;
@@ -386,10 +382,11 @@ async fn test_memory_search_rewrite() {
 
     // Create a memory via documents
     let doc_res = client
-        .post(format!("{base_url}/v3/documents"))
+        .post(format!("{base_url}/api/v1/documents"))
+        .header("Authorization", "Bearer test-key")
         .json(&json!({
             "content": "User prefers dark mode interface with blue accent colors.",
-            "container_tag": "user_prefs"
+            "containerTag": "user_prefs"
         }))
         .send()
         .await
@@ -399,25 +396,20 @@ async fn test_memory_search_rewrite() {
 
     tokio::time::sleep(tokio::time::Duration::from_secs(1)).await;
 
-    // Search memories without rewrite
+    // Search memories
     let search_res = client
-        .post(format!("{base_url}/v4/search"))
+        .post(format!("{base_url}/api/v1/search"))
+        .header("Authorization", "Bearer test-key")
         .json(&json!({
             "q": "interface preferences",
-            "container_tag": "user_prefs"
+            "containerTags": ["user_prefs"],
+            "scope": "memories"
         }))
         .send()
         .await
         .expect("Failed to send request");
 
     assert!(search_res.status().is_success());
-    let response_json: serde_json::Value = search_res.json().await.expect("Failed to parse JSON");
-
-    assert!(
-        response_json
-            .get("rewritten_query")
-            .map(|v| v.is_null())
-            .unwrap_or(true),
-        "rewritten_query should be None when rewrite not requested"
-    );
+    let body: serde_json::Value = search_res.json().await.expect("Failed to parse JSON");
+    assert!(body["data"]["results"].is_array());
 }

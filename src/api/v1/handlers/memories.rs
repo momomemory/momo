@@ -36,10 +36,7 @@ pub async fn create_memory(
         return ApiResponse::error(ErrorCode::InvalidRequest, "Container tag cannot be empty");
     }
 
-    let memory_type: MemoryType = req
-        .memory_type
-        .map(Into::into)
-        .unwrap_or(MemoryType::Fact);
+    let memory_type: MemoryType = req.memory_type.map(Into::into).unwrap_or(MemoryType::Fact);
 
     let memory = match state
         .memory
@@ -51,7 +48,11 @@ pub async fn create_memory(
                 for (k, v) in metadata {
                     mem.metadata.insert(k, v);
                 }
-                if let Err(e) = state.db.update_memory_relations(&mem.id, mem.memory_relations.clone()).await {
+                if let Err(e) = state
+                    .db
+                    .update_memory_relations(&mem.id, mem.memory_relations.clone())
+                    .await
+                {
                     tracing::warn!(error = %e, "Failed to persist metadata on new memory");
                 }
             }

@@ -261,14 +261,13 @@ impl PptxExtractor {
         archive: &mut ZipArchive<Cursor<&[u8]>>,
         path: &str,
     ) -> Result<String> {
-        let mut file = archive.by_name(path).map_err(|e| {
-            MomoError::Processing(format!("Failed to read {path} from PPTX: {e}"))
-        })?;
+        let mut file = archive
+            .by_name(path)
+            .map_err(|e| MomoError::Processing(format!("Failed to read {path} from PPTX: {e}")))?;
 
         let mut content = String::new();
-        file.read_to_string(&mut content).map_err(|e| {
-            MomoError::Processing(format!("Failed to read {path} content: {e}"))
-        })?;
+        file.read_to_string(&mut content)
+            .map_err(|e| MomoError::Processing(format!("Failed to read {path} content: {e}")))?;
 
         Ok(content)
     }

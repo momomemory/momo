@@ -1,3 +1,4 @@
+#[allow(dead_code)]
 mod api;
 mod provider;
 mod reranker;
@@ -6,4 +7,5 @@ mod reranker;
 mod tests;
 
 pub use provider::EmbeddingProvider;
-pub use reranker::{RerankerProvider, RerankResult};
+#[allow(unused_imports)] // RerankResult used in tests (services::search)
+pub use reranker::{RerankResult, RerankerProvider};

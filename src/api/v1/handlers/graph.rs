@@ -11,8 +11,8 @@ use crate::api::v1::dto::GraphResponse;
 use crate::api::v1::response::{ApiError, ApiResponse, ErrorCode};
 use crate::api::AppState;
 use crate::models::{
-    GraphData, GraphEdgeType, GraphNode, GraphNodeType,
-    GraphResponse as DomainGraphResponse, Metadata,
+    GraphData, GraphEdgeType, GraphNode, GraphNodeType, GraphResponse as DomainGraphResponse,
+    Metadata,
 };
 
 /// Query parameters for `GET /api/v1/memories/{memoryId}/graph`.
@@ -300,7 +300,10 @@ mod tests {
         assert_eq!(response.nodes[0].id, "doc_1");
 
         // Verify URL is in metadata
-        let url_val = response.nodes[0].metadata.get("url").expect("url in metadata");
+        let url_val = response.nodes[0]
+            .metadata
+            .get("url")
+            .expect("url in metadata");
         assert_eq!(url_val, "https://example.com");
     }
 }

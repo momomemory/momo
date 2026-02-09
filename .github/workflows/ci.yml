@@ -1,0 +1,51 @@
+name: Momo CI
+
+on:
+  push:
+    paths:
+      - '**'
+      - '.github/workflows/**'
+  pull_request:
+    paths:
+      - '**'
+      - '.github/workflows/**'
+
+concurrency:
+  group: "momo-ci-${{ github.ref }}"
+  cancel-in-progress: true
+
+jobs:
+  build:
+    name: Build / Lint / Test (momo)
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Cache cargo registry and target
+        uses: swatinem/rust-cache@v1
+
+      - name: Setup Rust toolchain
+        uses: actions-rs/toolchain@v1
+        with:
+          toolchain: stable
+          profile: minimal
+          components: rustfmt, clippy
+          override: true
+
+      - name: Check formatting
+        run: |
+          cargo fmt --all -- --check
+
+      - name: Cargo check (compile sanity)
+        run: |
+          cargo check --workspace --all-features
+
+      - name: Clippy (deny warnings)
+        run: |
+          cargo clippy --workspace --all-features -- -D warnings
+
+      - name: Run tests
+        run: |
+          # compile & run tests for the momo crate workspace
+          cargo test --workspace --all-features --no-fail-fast

@@ -74,11 +74,13 @@ impl GraphResponse {
     }
 
     /// Add a node to the graph
+    #[allow(dead_code)] // Public API
     pub fn add_node(&mut self, node: GraphNode) {
         self.nodes.push(node);
     }
 
     /// Add a link (edge) to the graph
+    #[allow(dead_code)] // Public API
     pub fn add_edge(&mut self, edge: GraphEdge) {
         self.links.push(edge);
     }
@@ -92,6 +94,7 @@ impl Default for GraphResponse {
 
 impl GraphNode {
     /// Create a new graph node
+    #[allow(dead_code)] // Public API constructor
     pub fn new(id: String, node_type: GraphNodeType) -> Self {
         Self {
             id,
@@ -112,6 +115,7 @@ impl GraphNode {
 
 impl GraphEdge {
     /// Create a new graph edge
+    #[allow(dead_code)] // Public API constructor
     pub fn new(source: String, target: String, edge_type: GraphEdgeType) -> Self {
         Self {
             source,

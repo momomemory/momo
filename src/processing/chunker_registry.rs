@@ -71,7 +71,6 @@ impl ChunkerRegistry {
     }
 }
 
-
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -171,7 +170,6 @@ mod tests {
         let config = ProcessingConfig {
             chunk_size: 1024,
             chunk_overlap: 100,
-            max_content_length: 5_000_000,
         };
         let registry = ChunkerRegistry::new(&config);
         let chunker = registry.get_chunker(&DocumentType::Text, None);
@@ -289,7 +287,6 @@ mod tests {
         let registry = ChunkerRegistry::default();
         let context = super::super::ChunkContext {
             source_path: Some("main.rs".to_string()),
-            doc_type: Some(DocumentType::Text),
         };
         let chunker = registry.get_chunker(&DocumentType::Text, Some("main.rs"));
         let chunks = chunker.chunk("fn main() {}", Some(&context));
@@ -302,7 +299,6 @@ mod tests {
         let chunker = registry.get_chunker(&DocumentType::Unknown, Some("app.py"));
         let context = super::super::ChunkContext {
             source_path: Some("app.py".to_string()),
-            doc_type: Some(DocumentType::Unknown),
         };
         let chunks = chunker.chunk("def main(): pass", Some(&context));
         assert!(!chunks.is_empty());

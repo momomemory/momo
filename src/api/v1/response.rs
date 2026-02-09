@@ -145,6 +145,7 @@ impl CursorPagination {
     /// - Clamps `limit` to `1..=100`.
     /// - Returns the validated struct (cursor validity is checked by the
     ///   repository layer at query time).
+    #[allow(dead_code)]
     pub fn validate(mut self) -> Self {
         self.limit = self.limit.clamp(1, 100);
         self

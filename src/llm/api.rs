@@ -1,7 +1,5 @@
-use std::pin::Pin;
 use std::time::Duration;
 
-use futures::{stream, Stream, StreamExt};
 use serde_json::Value;
 
 use async_openai::{
@@ -238,9 +236,7 @@ impl LlmApiClient {
             .into()];
 
         let mut request = CreateChatCompletionRequestArgs::default();
-        request
-            .model(self.config.model.clone())
-            .messages(messages);
+        request.model(self.config.model.clone()).messages(messages);
         Self::apply_completion_options(&mut request, options);
 
         request
@@ -431,7 +427,6 @@ mod tests {
             query_rewrite_timeout_secs: 5,
             enable_auto_relations: false,
             enable_contradiction_detection: false,
-            enable_llm_filter: false,
             filter_prompt: None,
         }
     }

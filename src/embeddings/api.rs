@@ -130,9 +130,7 @@ impl EmbeddingApiClient {
                     }
 
                     let body = resp.text().await.unwrap_or_default();
-                    return Err(MomoError::Embedding(format!(
-                        "API error {status}: {body}"
-                    )));
+                    return Err(MomoError::Embedding(format!("API error {status}: {body}")));
                 }
                 Err(e) => {
                     last_error = Some(MomoError::Embedding(format!("Request failed: {e}")));

@@ -1,10 +1,8 @@
 use scraper::{Html, Selector};
 use url::Url;
 
-use crate::config::OcrConfig;
 use crate::error::{MomoError, Result};
 use crate::models::DocumentType;
-use crate::ocr::OcrProvider;
 use crate::processing::extractors::{self, ExtractedContent};
 use crate::processing::language::detect_language;
 
@@ -318,7 +316,9 @@ impl ContentExtractor {
         let mut score: i32 = 0;
 
         // Check for shebang line
-        if trimmed.starts_with("#!") && (trimmed.starts_with("#!/usr/bin") || trimmed.starts_with("#!/bin")) {
+        if trimmed.starts_with("#!")
+            && (trimmed.starts_with("#!/usr/bin") || trimmed.starts_with("#!/bin"))
+        {
             score += 3;
         }
 
@@ -351,7 +351,11 @@ impl ContentExtractor {
         if sample.contains("import ") && sample.contains(" from ") {
             score += 2;
         }
-        if sample.contains("export ") && (sample.contains("default") || sample.contains("function") || sample.contains("class")) {
+        if sample.contains("export ")
+            && (sample.contains("default")
+                || sample.contains("function")
+                || sample.contains("class"))
+        {
             score += 2;
         }
 
@@ -361,7 +365,10 @@ impl ContentExtractor {
         }
 
         // Java/C/C++ patterns
-        if sample.contains("public class ") || sample.contains("private ") || sample.contains("protected ") {
+        if sample.contains("public class ")
+            || sample.contains("private ")
+            || sample.contains("protected ")
+        {
             score += 2;
         }
         if sample.contains("#include") {
@@ -385,7 +392,10 @@ impl ContentExtractor {
         }
 
         // Indentation patterns (consistent 2/4 space or tab indentation)
-        let indented_lines = lines.iter().filter(|l| l.starts_with("    ") || l.starts_with('\t')).count();
+        let indented_lines = lines
+            .iter()
+            .filter(|l| l.starts_with("    ") || l.starts_with('\t'))
+            .count();
         if lines.len() > 3 && indented_lines as f64 / lines.len() as f64 > 0.3 {
             score += 1;
         }
@@ -732,19 +742,31 @@ fn main() {
     #[test]
     fn test_detect_type_from_content_type_code_extensions() {
         assert_eq!(
-            ContentExtractor::detect_type_from_content_type("text/plain", "https://example.com/main.rs"),
+            ContentExtractor::detect_type_from_content_type(
+                "text/plain",
+                "https://example.com/main.rs"
+            ),
             DocumentType::Code
         );
         assert_eq!(
-            ContentExtractor::detect_type_from_content_type("text/plain", "https://example.com/app.py"),
+            ContentExtractor::detect_type_from_content_type(
+                "text/plain",
+                "https://example.com/app.py"
+            ),
             DocumentType::Code
         );
         assert_eq!(
-            ContentExtractor::detect_type_from_content_type("text/plain", "https://example.com/index.ts"),
+            ContentExtractor::detect_type_from_content_type(
+                "text/plain",
+                "https://example.com/index.ts"
+            ),
             DocumentType::Code
         );
         assert_eq!(
-            ContentExtractor::detect_type_from_content_type("text/plain", "https://example.com/readme.txt"),
+            ContentExtractor::detect_type_from_content_type(
+                "text/plain",
+                "https://example.com/readme.txt"
+            ),
             DocumentType::Text
         );
     }
@@ -758,15 +780,9 @@ fn main() {
         );
 
         let url = Url::parse("https://example.com/").unwrap();
-        assert_eq!(
-            ContentExtractor::extract_source_path_from_url(&url),
-            None
-        );
+        assert_eq!(ContentExtractor::extract_source_path_from_url(&url), None);
 
         let url = Url::parse("https://example.com/no-extension").unwrap();
-        assert_eq!(
-            ContentExtractor::extract_source_path_from_url(&url),
-            None
-        );
+        assert_eq!(ContentExtractor::extract_source_path_from_url(&url), None);
     }
 }

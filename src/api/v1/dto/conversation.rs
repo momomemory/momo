@@ -3,7 +3,7 @@
 use chrono::{DateTime, Utc};
 use serde::{Deserialize, Serialize};
 
-use super::common::{Metadata, V1MemoryType};
+use super::common::V1MemoryType;
 use crate::models;
 
 /// Request body for `POST /v1/conversation`.

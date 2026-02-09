@@ -1,7 +1,9 @@
 use std::sync::Arc;
 use tokio::sync::Mutex;
-use tracing::{info, debug};
-use whisper_rs::{WhisperContext as WhisperRsContext, WhisperContextParameters, FullParams, SamplingStrategy};
+use tracing::{debug, info};
+use whisper_rs::{
+    FullParams, SamplingStrategy, WhisperContext as WhisperRsContext, WhisperContextParameters,
+};
 
 use crate::config::TranscriptionConfig;
 use crate::error::{MomoError, Result};
@@ -22,14 +24,9 @@ impl WhisperContext {
     /// * `Ok(WhisperContext)` - Successfully initialized context
     /// * `Err(MomoError::Transcription)` - Failed to load model or invalid config
     pub fn new(config: &TranscriptionConfig) -> Result<Self> {
-        let model_path = config
-            .model_path
-            .as_ref()
-            .ok_or_else(|| {
-                MomoError::Transcription(
-                    "model_path is required for local Whisper backend".to_string(),
-                )
-            })?;
+        let model_path = config.model_path.as_ref().ok_or_else(|| {
+            MomoError::Transcription("model_path is required for local Whisper backend".to_string())
+        })?;
 
         info!(
             model_path = %model_path,
@@ -38,9 +35,8 @@ impl WhisperContext {
 
         let params = WhisperContextParameters::default();
 
-        let ctx = WhisperRsContext::new_with_params(model_path, params).map_err(|e| {
-            MomoError::Transcription(format!("Failed to load Whisper model: {e}"))
-        })?;
+        let ctx = WhisperRsContext::new_with_params(model_path, params)
+            .map_err(|e| MomoError::Transcription(format!("Failed to load Whisper model: {e}")))?;
 
         info!("Whisper context initialized successfully");
 
@@ -79,9 +75,9 @@ impl WhisperContext {
             params.set_print_progress(false);
             params.set_print_realtime(false);
 
-            let mut state = ctx
-                .create_state()
-                .map_err(|e| MomoError::Transcription(format!("Failed to create Whisper state: {e}")))?;
+            let mut state = ctx.create_state().map_err(|e| {
+                MomoError::Transcription(format!("Failed to create Whisper state: {e}"))
+            })?;
 
             state
                 .full(params, &samples)
@@ -89,7 +85,9 @@ impl WhisperContext {
 
             let num_segments = state.full_n_segments();
             if num_segments < 0 {
-                return Err(MomoError::Transcription("Invalid segment count".to_string()));
+                return Err(MomoError::Transcription(
+                    "Invalid segment count".to_string(),
+                ));
             }
 
             let mut transcript = String::new();
@@ -130,6 +128,7 @@ impl WhisperContext {
     }
 
     /// Get the configuration
+    #[allow(dead_code)]
     pub fn config(&self) -> &TranscriptionConfig {
         &self.config
     }
@@ -189,7 +188,7 @@ mod tests {
     async fn test_transcribe_error_handling() {
         let config = create_test_config(Some("/nonexistent/model.bin"));
         let result = WhisperContext::new(&config);
-        
+
         match result {
             Err(MomoError::Transcription(msg)) => {
                 assert!(msg.contains("Failed to load Whisper model"));
@@ -208,7 +207,6 @@ mod tests {
     #[tokio::test]
     #[ignore]
     async fn test_local_whisper_e2e() {
-        
         let model_path = std::env::var("WHISPER_MODEL_PATH")
             .unwrap_or_else(|_| "./models/ggml-small.en.bin".to_string());
 

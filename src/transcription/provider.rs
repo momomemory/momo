@@ -1,8 +1,8 @@
 use std::time::Duration;
 
-use tracing::{warn, info};
+use tracing::{info, warn};
 
-use crate::config::{TranscriptionConfig, parse_provider_model};
+use crate::config::{parse_provider_model, TranscriptionConfig};
 use crate::error::{MomoError, Result};
 
 use super::api::TranscriptionApiClient;
@@ -62,6 +62,16 @@ impl TranscriptionProvider {
         })
     }
 
+    #[cfg(test)]
+    pub fn unavailable(reason: &str) -> Self {
+        Self {
+            backend: TranscriptionBackend::Unavailable {
+                reason: reason.to_string(),
+            },
+            config: TranscriptionConfig::default(),
+        }
+    }
+
     pub fn is_available(&self) -> bool {
         !matches!(self.backend, TranscriptionBackend::Unavailable { .. })
     }
@@ -86,19 +96,15 @@ impl TranscriptionProvider {
             TranscriptionBackend::Local { whisper } => {
                 use super::preprocessing::AudioPreprocessor;
 
-                let (samples, sample_rate, channels) = AudioPreprocessor::decode(audio_bytes, None)?;
+                let (samples, sample_rate, channels) =
+                    AudioPreprocessor::decode(audio_bytes, None)?;
 
-                let pcm_samples = AudioPreprocessor::resample_to_16khz_mono(
-                    samples,
-                    sample_rate,
-                    channels,
-                )?;
+                let pcm_samples =
+                    AudioPreprocessor::resample_to_16khz_mono(samples, sample_rate, channels)?;
 
                 whisper.transcribe(&pcm_samples).await
             }
-            TranscriptionBackend::Api { client } => {
-                client.transcribe(audio_bytes, None).await
-            }
+            TranscriptionBackend::Api { client } => client.transcribe(audio_bytes, None).await,
             TranscriptionBackend::Unavailable { reason } => {
                 Err(MomoError::TranscriptionUnavailable(reason.clone()))
             }

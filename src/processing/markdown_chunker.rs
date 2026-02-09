@@ -40,8 +40,7 @@ impl ContentChunker for MarkdownChunker {
 
         chunks
             .iter()
-            .enumerate()
-            .map(|(_, chunk_text)| TextChunk {
+            .map(|chunk_text| TextChunk {
                 content: chunk_text.to_string(),
                 token_count: (chunk_text.len() as f32 / 4.0).ceil() as i32,
             })
@@ -111,7 +110,6 @@ mod tests {
         let config = ProcessingConfig {
             chunk_size: 256,
             chunk_overlap: 25,
-            max_content_length: 10_000_000,
         };
         let chunker = MarkdownChunker::new(&config);
 

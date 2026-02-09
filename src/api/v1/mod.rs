@@ -34,16 +34,10 @@ mod tests {
                 model: "BAAI/bge-small-en-v1.5".to_string(),
                 dimensions: 384,
                 batch_size: 256,
-                api_key: None,
-                base_url: None,
-                rate_limit: None,
-                timeout_secs: 30,
-                max_retries: 3,
             },
             processing: ProcessingConfig {
                 chunk_size: 512,
                 chunk_overlap: 50,
-                max_content_length: 10_000_000,
             },
             memory: MemoryConfig {
                 episode_decay_days: 30.0,
@@ -78,11 +72,9 @@ mod tests {
 
         let raw_db = crate::db::Database::new(&config.database).await.unwrap();
         let db_backend = crate::db::LibSqlBackend::new(raw_db);
-        let db: std::sync::Arc<dyn crate::db::DatabaseBackend> =
-            std::sync::Arc::new(db_backend);
+        let db: std::sync::Arc<dyn crate::db::DatabaseBackend> = std::sync::Arc::new(db_backend);
 
-        let embeddings =
-            crate::embeddings::EmbeddingProvider::new(&config.embeddings).unwrap();
+        let embeddings = crate::embeddings::EmbeddingProvider::new(&config.embeddings).unwrap();
         let ocr = crate::ocr::OcrProvider::new(&config.ocr).unwrap();
         let transcription =
             crate::transcription::TranscriptionProvider::new(&config.transcription).unwrap();
@@ -152,7 +144,9 @@ mod tests {
 
         assert_eq!(response.status(), StatusCode::OK);
         let json = body_json(response).await;
-        let version = json["openapi"].as_str().expect("openapi field should be a string");
+        let version = json["openapi"]
+            .as_str()
+            .expect("openapi field should be a string");
         assert!(
             version.starts_with("3"),
             "OpenAPI version should start with 3, got: {version}"

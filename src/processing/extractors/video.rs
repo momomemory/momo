@@ -36,7 +36,10 @@ impl VideoExtractor {
         // - Add YOUTUBE_API_KEY env var support
         if let Ok(s) = std::str::from_utf8(bytes) {
             let s_lower = s.to_lowercase();
-            if s_lower.contains("youtube.com") || s_lower.contains("youtu.be") || s_lower.contains("m.youtube.com") {
+            if s_lower.contains("youtube.com")
+                || s_lower.contains("youtu.be")
+                || s_lower.contains("m.youtube.com")
+            {
                 return Err(MomoError::Transcription(
                     "YouTube URLs are not yet supported. Video transcription requires uploaded files (MP4, WebM, AVI, MKV). See TODO in code for implementation.".to_string()
                 ));
@@ -69,10 +72,7 @@ impl VideoExtractor {
         // Extract audio from video using symphonia
         let audio_samples = Self::extract_audio_track(bytes)?;
 
-        tracing::debug!(
-            "Extracted {} audio samples from video",
-            audio_samples.len()
-        );
+        tracing::debug!("Extracted {} audio samples from video", audio_samples.len());
 
         // Encode the extracted PCM samples as WAV bytes so the transcription
         // provider receives valid audio (not the raw video container bytes).
@@ -169,7 +169,8 @@ impl VideoExtractor {
         );
 
         // Resample to 16kHz mono (Whisper requirement)
-        let preprocessed = AudioPreprocessor::resample_to_16khz_mono(samples, sample_rate, channels)?;
+        let preprocessed =
+            AudioPreprocessor::resample_to_16khz_mono(samples, sample_rate, channels)?;
 
         tracing::debug!(
             "Preprocessed to {} samples at 16kHz mono",
@@ -271,7 +272,10 @@ mod tests {
         assert!(result.is_err());
         let err = result.unwrap_err().to_string();
         let expected = "YouTube URLs are not yet supported. Video transcription requires uploaded files (MP4, WebM, AVI, MKV). See TODO in code for implementation.";
-        assert!(err.contains(expected), "Error should contain expected message: {err}");
+        assert!(
+            err.contains(expected),
+            "Error should contain expected message: {err}"
+        );
     }
 
     #[test]
@@ -303,7 +307,7 @@ mod tests {
         let s1 = i16::from_le_bytes([wav[46], wav[47]]);
 
         assert_eq!(s0, i16::MIN + 1); // -1.0 clamped → -32767
-        assert_eq!(s1, i16::MAX);     // 1.0 clamped → 32767
+        assert_eq!(s1, i16::MAX); // 1.0 clamped → 32767
     }
 
     #[test]

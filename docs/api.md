@@ -5,6 +5,7 @@ Welcome to the Momo API reference. Momo is a self-hostable AI memory system that
 [← Back to README](./README.md)
 
 ## Table of Contents
+
 - [Response Envelope](#response-envelope)
 - [Authentication](#authentication)
 - [Pagination](#pagination)
@@ -74,14 +75,14 @@ Next page cursors are provided in the `meta.nextCursor` field of the response.
 
 ## Error Codes
 
-| Code | HTTP Status | Description |
-|------|-------------|-------------|
-| `invalid_request` | 400 | The request parameters or body are invalid. |
-| `unauthorized` | 401 | Authentication is required or the provided token is invalid. |
-| `not_found` | 404 | The requested resource was not found. |
-| `conflict` | 409 | A conflict occurred (e.g., duplicate custom ID). |
-| `internal_error` | 500 | An unexpected server error occurred. |
-| `not_implemented` | 501 | The requested feature is not yet implemented. |
+| Code              | HTTP Status | Description                                                  |
+| ----------------- | ----------- | ------------------------------------------------------------ |
+| `invalid_request` | 400         | The request parameters or body are invalid.                  |
+| `unauthorized`    | 401         | Authentication is required or the provided token is invalid. |
+| `not_found`       | 404         | The requested resource was not found.                        |
+| `conflict`        | 409         | A conflict occurred (e.g., duplicate custom ID).             |
+| `internal_error`  | 500         | An unexpected server error occurred.                         |
+| `not_implemented` | 501         | The requested feature is not yet implemented.                |
 
 ---
 
@@ -96,21 +97,27 @@ Next page cursors are provided in the `meta.nextCursor` field of the response.
 ## Enums
 
 ### IngestionStatus
+
 `"queued"`, `"processing"`, `"completed"`, `"failed"`
 
 ### V1DocumentType
+
 `"text"`, `"pdf"`, `"webpage"`, `"image"`, `"video"`, `"audio"`, `"markdown"`, `"code"`, `"csv"`, `"docx"`, `"pptx"`, `"xlsx"`, `"unknown"`
 
 ### V1MemoryType
+
 `"fact"`, `"preference"`, `"episode"`
 
 ### SearchScope
+
 `"documents"`, `"memories"`, `"hybrid"` (default)
 
 ### GraphNodeType
+
 `"memory"`, `"document"`
 
 ### GraphEdgeType
+
 `"updates"`, `"relatesTo"`, `"conflictsWith"`, `"derivedFrom"`, `"sources"`
 
 ---
@@ -118,14 +125,17 @@ Next page cursors are provided in the `meta.nextCursor` field of the response.
 ## Health & System
 
 ### Health Check
+
 `GET /api/v1/health`
 
 **Example Request:**
+
 ```bash
 curl http://localhost:3000/api/v1/health
 ```
 
 **Example Response:**
+
 ```json
 {
   "data": {
@@ -136,14 +146,17 @@ curl http://localhost:3000/api/v1/health
 ```
 
 ### OpenAPI Spec
+
 `GET /api/v1/openapi.json`
 
 **Example Request:**
+
 ```bash
 curl http://localhost:3000/api/v1/openapi.json
 ```
 
 ### API Documentation (UI)
+
 `GET /api/v1/docs`
 
 Renders the ReDoc UI for API exploration.
@@ -153,9 +166,11 @@ Renders the ReDoc UI for API exploration.
 ## Documents
 
 ### Create Document
+
 `POST /api/v1/documents`
 
 **Example Request:**
+
 ```bash
 curl -X POST http://localhost:3000/api/v1/documents \
   -H "Authorization: Bearer <token>" \
@@ -171,6 +186,7 @@ curl -X POST http://localhost:3000/api/v1/documents \
 ```
 
 **Example Response (202 Accepted):**
+
 ```json
 {
   "data": {
@@ -181,15 +197,18 @@ curl -X POST http://localhost:3000/api/v1/documents \
 ```
 
 ### List Documents
+
 `GET /api/v1/documents`
 
 **Example Request:**
+
 ```bash
 curl "http://localhost:3000/api/v1/documents?containerTags=user_123&limit=10" \
   -H "Authorization: Bearer <token>"
 ```
 
 **Example Response:**
+
 ```json
 {
   "data": {
@@ -214,15 +233,18 @@ curl "http://localhost:3000/api/v1/documents?containerTags=user_123&limit=10" \
 ```
 
 ### Get Document
+
 `GET /api/v1/documents/{documentId}`
 
 **Example Request:**
+
 ```bash
 curl http://localhost:3000/api/v1/documents/V1StGXR8_Z5jdHi6B-myT \
   -H "Authorization: Bearer <token>"
 ```
 
 **Example Response:**
+
 ```json
 {
   "data": {
@@ -244,9 +266,11 @@ curl http://localhost:3000/api/v1/documents/V1StGXR8_Z5jdHi6B-myT \
 ```
 
 ### Update Document
+
 `PATCH /api/v1/documents/{documentId}`
 
 **Example Request:**
+
 ```bash
 curl -X PATCH http://localhost:3000/api/v1/documents/V1StGXR8_Z5jdHi6B-myT \
   -H "Authorization: Bearer <token>" \
@@ -258,18 +282,22 @@ curl -X PATCH http://localhost:3000/api/v1/documents/V1StGXR8_Z5jdHi6B-myT \
 ```
 
 ### Delete Document
+
 `DELETE /api/v1/documents/{documentId}`
 
 **Example Request:**
+
 ```bash
 curl -X DELETE http://localhost:3000/api/v1/documents/V1StGXR8_Z5jdHi6B-myT \
   -H "Authorization: Bearer <token>"
 ```
 
 ### Batch Create Documents
+
 `POST /api/v1/documents:batch`
 
 **Example Request:**
+
 ```bash
 curl -X POST http://localhost:3000/api/v1/documents:batch \
   -H "Authorization: Bearer <token>" \
@@ -284,9 +312,11 @@ curl -X POST http://localhost:3000/api/v1/documents:batch \
 ```
 
 ### Upload File
+
 `POST /api/v1/documents:upload`
 
 **Example Request:**
+
 ```bash
 curl -X POST http://localhost:3000/api/v1/documents:upload \
   -H "Authorization: Bearer <token>" \
@@ -299,15 +329,18 @@ curl -X POST http://localhost:3000/api/v1/documents:upload \
 ## Ingestions
 
 ### Get Ingestion Status
+
 `GET /api/v1/ingestions/{ingestionId}`
 
 **Example Request:**
+
 ```bash
 curl http://localhost:3000/api/v1/ingestions/550e8400-e29b-41d4-a716-446655440000 \
   -H "Authorization: Bearer <token>"
 ```
 
 **Example Response:**
+
 ```json
 {
   "data": {
@@ -324,9 +357,11 @@ curl http://localhost:3000/api/v1/ingestions/550e8400-e29b-41d4-a716-44665544000
 ## Search
 
 ### Unified Search
+
 `POST /api/v1/search`
 
 **Example Request:**
+
 ```bash
 curl -X POST http://localhost:3000/api/v1/search \
   -H "Authorization: Bearer <token>" \
@@ -340,6 +375,7 @@ curl -X POST http://localhost:3000/api/v1/search \
 ```
 
 **Example Response:**
+
 ```json
 {
   "data": {
@@ -377,9 +413,11 @@ curl -X POST http://localhost:3000/api/v1/search \
 ## Memories
 
 ### Create Memory
+
 `POST /api/v1/memories`
 
 **Example Request:**
+
 ```bash
 curl -X POST http://localhost:3000/api/v1/memories \
   -H "Authorization: Bearer <token>" \
@@ -392,6 +430,7 @@ curl -X POST http://localhost:3000/api/v1/memories \
 ```
 
 **Example Response (201 Created):**
+
 ```json
 {
   "data": {
@@ -412,27 +451,33 @@ curl -X POST http://localhost:3000/api/v1/memories \
 ```
 
 ### List Memories
+
 `GET /api/v1/memories`
 
 **Example Request:**
+
 ```bash
 curl "http://localhost:3000/api/v1/memories?containerTag=user_123&limit=20" \
   -H "Authorization: Bearer <token>"
 ```
 
 ### Get Memory
+
 `GET /api/v1/memories/{memoryId}`
 
 **Example Request:**
+
 ```bash
 curl http://localhost:3000/api/v1/memories/mem_abc123 \
   -H "Authorization: Bearer <token>"
 ```
 
 ### Update Memory
+
 `PATCH /api/v1/memories/{memoryId}`
 
 **Example Request:**
+
 ```bash
 curl -X PATCH http://localhost:3000/api/v1/memories/mem_abc123 \
   -H "Authorization: Bearer <token>" \
@@ -444,6 +489,7 @@ curl -X PATCH http://localhost:3000/api/v1/memories/mem_abc123 \
 ```
 
 **Example Response:**
+
 ```json
 {
   "data": {
@@ -456,9 +502,11 @@ curl -X PATCH http://localhost:3000/api/v1/memories/mem_abc123 \
 ```
 
 ### Delete Memory (Forget by ID)
+
 `DELETE /api/v1/memories/{memoryId}`
 
 **Example Request:**
+
 ```bash
 curl -X DELETE http://localhost:3000/api/v1/memories/mem_abc123 \
   -H "Authorization: Bearer <token>" \
@@ -467,6 +515,7 @@ curl -X DELETE http://localhost:3000/api/v1/memories/mem_abc123 \
 ```
 
 **Example Response:**
+
 ```json
 {
   "data": {
@@ -477,9 +526,11 @@ curl -X DELETE http://localhost:3000/api/v1/memories/mem_abc123 \
 ```
 
 ### Forget Memory by Content
+
 `POST /api/v1/memories:forget`
 
 **Example Request:**
+
 ```bash
 curl -X POST http://localhost:3000/api/v1/memories:forget \
   -H "Authorization: Bearer <token>" \
@@ -492,6 +543,7 @@ curl -X POST http://localhost:3000/api/v1/memories:forget \
 ```
 
 **Example Response:**
+
 ```json
 {
   "data": {
@@ -506,15 +558,18 @@ curl -X POST http://localhost:3000/api/v1/memories:forget \
 ## Graph
 
 ### Memory Graph
+
 `GET /api/v1/memories/{memoryId}/graph`
 
 **Example Request:**
+
 ```bash
 curl http://localhost:3000/api/v1/memories/mem_abc123/graph \
   -H "Authorization: Bearer <token>"
 ```
 
 **Example Response:**
+
 ```json
 {
   "data": {
@@ -530,9 +585,11 @@ curl http://localhost:3000/api/v1/memories/mem_abc123/graph \
 ```
 
 ### Container Graph
+
 `GET /api/v1/containers/{tag}/graph`
 
 **Example Request:**
+
 ```bash
 curl http://localhost:3000/api/v1/containers/user_123/graph \
   -H "Authorization: Bearer <token>"
@@ -543,9 +600,11 @@ curl http://localhost:3000/api/v1/containers/user_123/graph \
 ## Profile
 
 ### Compute User Profile
+
 `POST /api/v1/profile:compute`
 
 **Example Request:**
+
 ```bash
 curl -X POST http://localhost:3000/api/v1/profile:compute \
   -H "Authorization: Bearer <token>" \
@@ -557,13 +616,18 @@ curl -X POST http://localhost:3000/api/v1/profile:compute \
 ```
 
 **Example Response:**
+
 ```json
 {
   "data": {
     "containerTag": "user_123",
     "narrative": "The user lives in Berlin and likes pizza.",
     "staticFacts": [
-      { "content": "Lives in Berlin", "confidence": 1.0, "createdAt": "2024-02-08T12:00:00Z" }
+      {
+        "content": "Lives in Berlin",
+        "confidence": 1.0,
+        "createdAt": "2024-02-08T12:00:00Z"
+      }
     ],
     "dynamicFacts": [],
     "totalMemories": 2,
@@ -577,9 +641,11 @@ curl -X POST http://localhost:3000/api/v1/profile:compute \
 ## Conversations
 
 ### Ingest Conversation
+
 `POST /api/v1/conversations:ingest`
 
 **Example Request:**
+
 ```bash
 curl -X POST http://localhost:3000/api/v1/conversations:ingest \
   -H "Authorization: Bearer <token>" \
@@ -594,6 +660,7 @@ curl -X POST http://localhost:3000/api/v1/conversations:ingest \
 ```
 
 **Example Response (201 Created):**
+
 ```json
 {
   "data": {
@@ -609,15 +676,18 @@ curl -X POST http://localhost:3000/api/v1/conversations:ingest \
 ## Admin
 
 ### Run Forgetting Cycle
+
 `POST /api/v1/admin/forgetting:run`
 
 **Example Request:**
+
 ```bash
 curl -X POST http://localhost:3000/api/v1/admin/forgetting:run \
   -H "Authorization: Bearer <token>"
 ```
 
 **Example Response:**
+
 ```json
 {
   "data": {
@@ -626,4 +696,3 @@ curl -X POST http://localhost:3000/api/v1/admin/forgetting:run \
   }
 }
 ```
-

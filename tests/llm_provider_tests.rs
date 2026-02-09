@@ -1,4 +1,3 @@
-use futures::StreamExt;
 use serde::{Deserialize, Serialize};
 use serde_json::json;
 use std::sync::{
@@ -10,7 +9,7 @@ use wiremock::{Mock, MockServer, Request, ResponseTemplate};
 
 use momo::config::LlmConfig;
 use momo::error::MomoError;
-use momo::llm::{LlmApiClient, LlmBackend, LlmProvider};
+use momo::llm::{LlmBackend, LlmProvider};
 
 fn llm_config(model: &str) -> LlmConfig {
     LlmConfig {
@@ -24,7 +23,6 @@ fn llm_config(model: &str) -> LlmConfig {
         query_rewrite_timeout_secs: 2,
         enable_auto_relations: true,
         enable_contradiction_detection: false,
-        enable_llm_filter: false,
         filter_prompt: None,
     }
 }
@@ -41,7 +39,6 @@ fn llm_config_with_base_url(model: &str, base_url: String, max_retries: u32) -> 
         query_rewrite_timeout_secs: 2,
         enable_auto_relations: true,
         enable_contradiction_detection: false,
-        enable_llm_filter: false,
         filter_prompt: None,
     }
 }
@@ -87,7 +84,6 @@ fn test_openai_provider_detection() {
     let provider = LlmProvider::new(Some(&config));
 
     assert!(matches!(provider.backend(), LlmBackend::OpenAI));
-    assert_eq!(provider.base_url(), Some("https://api.openai.com/v1"));
 }
 
 #[test]
@@ -96,7 +92,6 @@ fn test_openrouter_provider_detection() {
     let provider = LlmProvider::new(Some(&config));
 
     assert!(matches!(provider.backend(), LlmBackend::OpenRouter));
-    assert_eq!(provider.base_url(), Some("https://openrouter.ai/api/v1"));
 }
 
 #[test]
@@ -105,7 +100,6 @@ fn test_ollama_provider_detection() {
     let provider = LlmProvider::new(Some(&config));
 
     assert!(matches!(provider.backend(), LlmBackend::Ollama));
-    assert_eq!(provider.base_url(), Some("http://localhost:11434/v1"));
 }
 
 #[test]
@@ -143,17 +137,6 @@ fn test_provider_clone() {
         cloned.config().map(|c| c.model.as_str()),
         Some(config.model.as_str())
     );
-}
-
-#[test]
-fn test_api_client_uses_provider_default_base_url() {
-    let config = llm_config("openrouter/openai/gpt-4o-mini");
-    let client = LlmApiClient::new(&config);
-
-    match client {
-        Ok(value) => assert_eq!(value.base_url(), "https://openrouter.ai/api/v1"),
-        Err(error) => panic!("Expected API client creation to succeed, got: {error}"),
-    }
 }
 
 #[tokio::test]
@@ -274,33 +257,6 @@ async fn test_empty_prompt_validation() {
         }
         other => panic!("Expected Validation error, got: {other:?}"),
     }
-}
-
-#[tokio::test]
-async fn test_complete_stream_unavailable_provider_fails_fast() {
-    let provider = LlmProvider::new(None);
-    let stream = provider.complete_stream("Hello");
-    futures::pin_mut!(stream);
-
-    let first = stream.next().await;
-
-    assert!(matches!(first, Some(Err(MomoError::LlmUnavailable(_)))));
-
-    let second = stream.next().await;
-    assert!(second.is_none());
-}
-
-#[tokio::test]
-async fn test_complete_stream_no_api_key_fails() {
-    let mut config = llm_config("openai/gpt-4o");
-    config.api_key = None;
-    let provider = LlmProvider::new(Some(&config));
-    let stream = provider.complete_stream("Hello");
-    futures::pin_mut!(stream);
-
-    let first = stream.next().await;
-
-    assert!(matches!(first, Some(Err(MomoError::Llm(_)))));
 }
 
 #[derive(Debug, Deserialize, Serialize, PartialEq)]

@@ -290,7 +290,8 @@ impl SearchService {
 
         let doc_ids: Vec<String> = doc_chunks.keys().cloned().collect();
         let docs = self.db.get_documents_by_ids(&doc_ids).await?;
-        let doc_map: HashMap<String, Document> = docs.into_iter().map(|d| (d.id.clone(), d)).collect();
+        let doc_map: HashMap<String, Document> =
+            docs.into_iter().map(|d| (d.id.clone(), d)).collect();
 
         for (doc_id, chunks) in doc_chunks {
             if let Some(doc) = doc_map.get(&doc_id) {
@@ -353,10 +354,7 @@ impl SearchService {
                         }
                     };
 
-                    let config_top_k = self
-                        .reranker
-                        .as_ref().map(|_| 100)
-                        .unwrap_or(100);
+                    let config_top_k = self.reranker.as_ref().map(|_| 100).unwrap_or(100);
                     let rerank_top_k = req.rerank_top_k.unwrap_or(config_top_k);
 
                     match self
@@ -523,8 +521,7 @@ impl SearchService {
             .await?;
 
         let include_opts = req.include.unwrap_or_default();
-        let ranker =
-            TemporalSearchRanker::new(self.episode_decay_days, self.episode_decay_factor);
+        let ranker = TemporalSearchRanker::new(self.episode_decay_days, self.episode_decay_factor);
 
         let mut results: Vec<MemorySearchResult> = Vec::new();
 
@@ -607,11 +604,7 @@ impl SearchService {
                 None
             };
 
-            let documents = if include_opts.documents.unwrap_or(false) {
-                None
-            } else {
-                None
-            };
+            let documents = None;
 
             results.push(MemorySearchResult {
                 id: memory.id,
@@ -776,7 +769,8 @@ impl SearchService {
 
             let doc_ids: Vec<String> = doc_chunks.keys().cloned().collect();
             let docs = self.db.get_documents_by_ids(&doc_ids).await?;
-            let doc_map: HashMap<String, Document> = docs.into_iter().map(|d| (d.id.clone(), d)).collect();
+            let doc_map: HashMap<String, Document> =
+                docs.into_iter().map(|d| (d.id.clone(), d)).collect();
 
             for (doc_id, chunks) in doc_chunks {
                 if let Some(doc) = doc_map.get(&doc_id) {
@@ -1082,8 +1076,10 @@ impl SearchService {
 mod tests {
     use super::*;
     use crate::config::{Config, EmbeddingsConfig};
+    use crate::db::repository::{
+        ChunkRepository, DocumentRepository, MemoryRepository, MemorySourcesRepository,
+    };
     use crate::db::{Database, LibSqlBackend};
-    use crate::db::repository::{ChunkRepository, DocumentRepository, MemoryRepository, MemorySourcesRepository};
     use crate::embeddings::RerankResult;
     use crate::llm::LlmProvider;
     use crate::models::{Document, Memory, MemoryType, ProcessingStatus};
@@ -1336,7 +1332,11 @@ mod tests {
         assert!(result.rerank_score.is_none());
     }
 
-    async fn setup_hybrid_db() -> (Arc<dyn DatabaseBackend>, libsql::Connection, tempfile::TempDir) {
+    async fn setup_hybrid_db() -> (
+        Arc<dyn DatabaseBackend>,
+        libsql::Connection,
+        tempfile::TempDir,
+    ) {
         let temp_dir = tempfile::tempdir().unwrap();
         let db_path = temp_dir.path().join("hybrid.db");
         let config = crate::config::DatabaseConfig {
@@ -1369,27 +1369,22 @@ mod tests {
             .await;
 
         let config = EmbeddingsConfig {
-            model: "openai/text-embedding-3-small".to_string(),
+            model: "BAAI/bge-small-en-v1.5".to_string(),
             dimensions: 384,
             batch_size: 2,
-            api_key: Some("test-key".to_string()),
-            base_url: Some(mock_server.uri()),
-            rate_limit: None,
-            timeout_secs: 5,
-            max_retries: 0,
         };
 
-        let provider = EmbeddingProvider::new_async(&config)
-            .await
-            .expect("failed to create embeddings provider");
+        let provider =
+            EmbeddingProvider::new(&config).expect("failed to create embeddings provider");
 
         (provider, mock_server)
     }
 
-    async fn insert_document_with_chunks(
+    async fn insert_document_with_chunks_real(
         conn: &libsql::Connection,
         doc_id: &str,
         chunk_contents: &[&str],
+        embeddings: &EmbeddingProvider,
     ) {
         let now = Utc::now();
         let doc = Document {
@@ -1428,19 +1423,19 @@ mod tests {
 
             ChunkRepository::create(conn, &chunk).await.unwrap();
 
-            let mut embedding = vec![0.0f32; 384];
-            embedding[0] = 1.0;
+            let embedding = embeddings.embed_passage(content).await.unwrap();
             ChunkRepository::update_embedding(conn, &chunk.id, &embedding)
                 .await
                 .unwrap();
         }
     }
 
-    async fn insert_memory(
+    async fn insert_memory_real(
         conn: &libsql::Connection,
         memory_id: &str,
         container_tag: Option<&str>,
         updated_at: DateTime<Utc>,
+        embeddings: &EmbeddingProvider,
     ) -> Memory {
         let mut memory = Memory::new(
             memory_id.to_string(),
@@ -1453,8 +1448,7 @@ mod tests {
 
         MemoryRepository::create(conn, &memory).await.unwrap();
 
-        let mut embedding = vec![0.0f32; 384];
-        embedding[0] = 1.0;
+        let embedding = embeddings.embed_passage(&memory.memory).await.unwrap();
         MemoryRepository::update_embedding(conn, &memory.id, &embedding)
             .await
             .unwrap();
@@ -1465,8 +1459,9 @@ mod tests {
     #[tokio::test]
     async fn test_search_hybrid_updates_last_accessed_for_returned_episode_memories() {
         let (db, conn, _temp_dir) = setup_hybrid_db().await;
+        let (embeddings, _mock_server) = test_embeddings_provider().await;
 
-        insert_document_with_chunks(&conn, "doc1", &["chunk one"]).await;
+        insert_document_with_chunks_real(&conn, "doc1", &["chunk one"], &embeddings).await;
 
         // Create an episode memory that should be updated
         let mut episode = Memory::new(
@@ -1477,9 +1472,8 @@ mod tests {
         episode.memory_type = MemoryType::Episode;
         episode.container_tag = Some("space".to_string());
         MemoryRepository::create(&conn, &episode).await.unwrap();
-        let mut embedding = vec![0.0f32; 384];
-        embedding[0] = 1.0;
-        MemoryRepository::update_embedding(&conn, &episode.id, &embedding)
+        let ep_embedding = embeddings.embed_passage(&episode.memory).await.unwrap();
+        MemoryRepository::update_embedding(&conn, &episode.id, &ep_embedding)
             .await
             .unwrap();
 
@@ -1492,11 +1486,11 @@ mod tests {
         fact.memory_type = MemoryType::Fact;
         fact.container_tag = Some("space".to_string());
         MemoryRepository::create(&conn, &fact).await.unwrap();
-        MemoryRepository::update_embedding(&conn, &fact.id, &embedding)
+        let fact_embedding = embeddings.embed_passage(&fact.memory).await.unwrap();
+        MemoryRepository::update_embedding(&conn, &fact.id, &fact_embedding)
             .await
             .unwrap();
 
-        let (embeddings, _mock_server) = test_embeddings_provider().await;
         let service = SearchService::new(
             db,
             embeddings,
@@ -1538,10 +1532,12 @@ mod tests {
     #[tokio::test]
     async fn test_search_hybrid_returns_both_types() {
         let (db, conn, _temp_dir) = setup_hybrid_db().await;
-        insert_document_with_chunks(&conn, "doc1", &["chunk one"]).await;
-        insert_memory(&conn, "mem1", Some("space"), Utc::now()).await;
 
         let (embeddings, _mock_server) = test_embeddings_provider().await;
+
+        insert_document_with_chunks_real(&conn, "doc1", &["chunk one"], &embeddings).await;
+        insert_memory_real(&conn, "mem1", Some("space"), Utc::now(), &embeddings).await;
+
         let service = SearchService::new(
             db,
             embeddings,
@@ -1572,14 +1568,14 @@ mod tests {
     #[tokio::test]
     async fn test_search_hybrid_deduplicates_document_chunks_when_memory_sources_exist() {
         let (db, conn, _temp_dir) = setup_hybrid_db().await;
-        insert_document_with_chunks(&conn, "doc1", &["chunk one"]).await;
-        insert_memory(&conn, "mem1", Some("space"), Utc::now()).await;
+        let (embeddings, _mock_server) = test_embeddings_provider().await;
+
+        insert_document_with_chunks_real(&conn, "doc1", &["chunk one"], &embeddings).await;
+        insert_memory_real(&conn, "mem1", Some("space"), Utc::now(), &embeddings).await;
 
         MemorySourcesRepository::create(&conn, "mem1", "doc1", None)
             .await
             .unwrap();
-
-        let (embeddings, _mock_server) = test_embeddings_provider().await;
         let service = SearchService::new(
             db,
             embeddings,
@@ -1609,11 +1605,12 @@ mod tests {
     #[tokio::test]
     async fn test_search_hybrid_respects_limit() {
         let (db, conn, _temp_dir) = setup_hybrid_db().await;
-        insert_document_with_chunks(&conn, "doc1", &["chunk one", "chunk two"]).await;
-        insert_memory(&conn, "mem1", Some("space"), Utc::now()).await;
-        insert_memory(&conn, "mem2", Some("space"), Utc::now()).await;
-
         let (embeddings, _mock_server) = test_embeddings_provider().await;
+
+        insert_document_with_chunks_real(&conn, "doc1", &["chunk one", "chunk two"], &embeddings)
+            .await;
+        insert_memory_real(&conn, "mem1", Some("space"), Utc::now(), &embeddings).await;
+        insert_memory_real(&conn, "mem2", Some("space"), Utc::now(), &embeddings).await;
         let service = SearchService::new(
             db,
             embeddings,
@@ -1642,8 +1639,10 @@ mod tests {
     #[tokio::test]
     async fn test_search_hybrid_reranking_applies_to_memories() {
         let (db, conn, _temp_dir) = setup_hybrid_db().await;
-        insert_memory(&conn, "mem1", Some("space"), Utc::now()).await;
-        insert_memory(&conn, "mem2", Some("space"), Utc::now()).await;
+        let (embeddings, _mock_server) = test_embeddings_provider().await;
+
+        insert_memory_real(&conn, "mem1", Some("space"), Utc::now(), &embeddings).await;
+        insert_memory_real(&conn, "mem2", Some("space"), Utc::now(), &embeddings).await;
 
         let reranker = RerankerProvider::new_mock(vec![
             RerankResult {
@@ -1658,7 +1657,6 @@ mod tests {
             },
         ]);
 
-        let (embeddings, _mock_server) = test_embeddings_provider().await;
         let service = SearchService::new(
             db,
             embeddings,
@@ -1689,14 +1687,15 @@ mod tests {
     #[tokio::test]
     async fn test_search_hybrid_partial_failure_returns_other_domain() {
         let (db, conn, _temp_dir) = setup_hybrid_db().await;
-        insert_memory(&conn, "mem1", Some("space"), Utc::now()).await;
+        let (embeddings, _mock_server) = test_embeddings_provider().await;
+
+        insert_memory_real(&conn, "mem1", Some("space"), Utc::now(), &embeddings).await;
 
         conn.execute("PRAGMA foreign_keys = OFF", ()).await.unwrap();
         conn.execute("DROP TABLE IF EXISTS chunks", ())
             .await
             .unwrap();
 
-        let (embeddings, _mock_server) = test_embeddings_provider().await;
         let service = SearchService::new(
             db,
             embeddings,

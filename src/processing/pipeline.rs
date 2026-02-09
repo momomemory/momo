@@ -63,13 +63,9 @@ impl ProcessingPipeline {
     }
 
     pub async fn process_document(&self, doc_id: &str) -> Result<()> {
-        let doc = self
-            .db
-            .get_document_by_id(doc_id)
-            .await?
-            .ok_or_else(|| {
-                crate::error::MomoError::NotFound(format!("Document {doc_id} not found"))
-            })?;
+        let doc = self.db.get_document_by_id(doc_id).await?.ok_or_else(|| {
+            crate::error::MomoError::NotFound(format!("Document {doc_id} not found"))
+        })?;
 
         self.db
             .update_document_status(doc_id, ProcessingStatus::Extracting, None)
@@ -137,7 +133,7 @@ impl ProcessingPipeline {
 
         // LLM Filter Step: Check if document should be filtered
         let container_tag = doc.container_tags.first().map(|s| s.as_str()).unwrap_or("");
-        
+
         if !container_tag.is_empty() {
             use crate::intelligence::filter::FilterDecision;
 
@@ -151,7 +147,7 @@ impl ProcessingPipeline {
                 .llm_filter
                 .filter_content(&extracted.text, container_tag, doc_id, override_prompt)
                 .await?;
-            
+
             match filter_result.decision {
                 FilterDecision::Skip => {
                     let reason = filter_result
@@ -159,7 +155,7 @@ impl ProcessingPipeline {
                         .as_deref()
                         .unwrap_or("Content filtered by LLM");
                     let error_message = format!("Filtered: {reason}");
-                    
+
                     tracing::info!(
                         container_tag = %container_tag,
                         doc_id = %doc_id,
@@ -167,7 +163,7 @@ impl ProcessingPipeline {
                         filter_reasoning = %reason,
                         "Document filtered out by LLM"
                     );
-                    
+
                     self.db
                         .update_document_status(
                             doc_id,
@@ -175,7 +171,7 @@ impl ProcessingPipeline {
                             Some(&error_message),
                         )
                         .await?;
-                    
+
                     return Ok(());
                 }
                 FilterDecision::Include => {
@@ -206,7 +202,7 @@ impl ProcessingPipeline {
 
         tracing::debug!(
             "Using {:?} chunker for document type {:?}",
-            std::any::type_name_of_val(&chunker),
+            std::any::type_name::<dyn crate::processing::chunker::ContentChunker>(),
             extracted.doc_type
         );
 
@@ -239,11 +235,7 @@ impl ProcessingPipeline {
             Ok(e) => e,
             Err(e) => {
                 self.db
-                    .update_document_status(
-                        doc_id,
-                        ProcessingStatus::Failed,
-                        Some(&e.to_string()),
-                    )
+                    .update_document_status(doc_id, ProcessingStatus::Failed, Some(&e.to_string()))
                     .await?;
                 return Err(e);
             }
@@ -265,8 +257,12 @@ impl ProcessingPipeline {
         updated_doc.title = extracted.title.or(doc.title);
         updated_doc.doc_type = match (&doc.doc_type, &extracted.doc_type) {
             // Don't downgrade specific types to generic Text/Unknown
-            (DocumentType::Code, DocumentType::Text | DocumentType::Unknown) => doc.doc_type.clone(),
-            (DocumentType::Markdown, DocumentType::Text | DocumentType::Unknown) => doc.doc_type.clone(),
+            (DocumentType::Code, DocumentType::Text | DocumentType::Unknown) => {
+                doc.doc_type.clone()
+            }
+            (DocumentType::Markdown, DocumentType::Text | DocumentType::Unknown) => {
+                doc.doc_type.clone()
+            }
             _ => extracted.doc_type,
         };
         updated_doc.url = extracted.url.or(doc.url);
@@ -399,8 +395,10 @@ impl ProcessingPipeline {
             };
 
             self.db.create_memory(&memory).await?;
-            if let Err(error) =
-                self.db.create_memory_source(&memory.id, &doc.id, None).await
+            if let Err(error) = self
+                .db
+                .create_memory_source(&memory.id, &doc.id, None)
+                .await
             {
                 tracing::warn!(
                     doc_id = %doc.id,
@@ -544,8 +542,8 @@ impl Clone for ProcessingPipeline {
 mod tests {
     use super::*;
     use crate::config::{DatabaseConfig, EmbeddingsConfig, LlmConfig};
-    use crate::db::{Database, LibSqlBackend};
     use crate::db::repository::{DocumentRepository, MemoryRepository, MemorySourcesRepository};
+    use crate::db::{Database, LibSqlBackend};
     use crate::models::Document;
     use serde_json::json;
     use tempfile::tempdir;
@@ -602,21 +600,14 @@ mod tests {
             .await;
 
         let embeddings_config = EmbeddingsConfig {
-            model: "openai/text-embedding-3-small".to_string(),
+            model: "BAAI/bge-small-en-v1.5".to_string(),
             dimensions: 384,
             batch_size: 8,
-            api_key: Some("test-key".to_string()),
-            base_url: Some(mock_server.uri()),
-            rate_limit: None,
-            timeout_secs: 5,
-            max_retries: 0,
         };
 
-        let embeddings = EmbeddingProvider::new_async(&embeddings_config)
-            .await
+        let embeddings = EmbeddingProvider::new(&embeddings_config)
             .expect("failed to create embeddings provider");
-        let memory_embeddings = EmbeddingProvider::new_async(&embeddings_config)
-            .await
+        let memory_embeddings = EmbeddingProvider::new(&embeddings_config)
             .expect("failed to create memory embeddings provider");
 
         let llm_config = LlmConfig {
@@ -630,7 +621,6 @@ mod tests {
             query_rewrite_timeout_secs: 2,
             enable_auto_relations: false,
             enable_contradiction_detection: false,
-            enable_llm_filter: false,
             filter_prompt: None,
         };
 
@@ -719,18 +709,12 @@ mod tests {
             .await;
 
         let embeddings_config = EmbeddingsConfig {
-            model: "openai/text-embedding-3-small".to_string(),
+            model: "BAAI/bge-small-en-v1.5".to_string(),
             dimensions: 384,
             batch_size: 8,
-            api_key: Some("test-key".to_string()),
-            base_url: Some(mock_server.uri()),
-            rate_limit: None,
-            timeout_secs: 5,
-            max_retries: 0,
         };
 
-        let embeddings = EmbeddingProvider::new_async(&embeddings_config)
-            .await
+        let embeddings = EmbeddingProvider::new(&embeddings_config)
             .expect("failed to create embeddings provider");
 
         let llm_config = LlmConfig {
@@ -744,7 +728,6 @@ mod tests {
             query_rewrite_timeout_secs: 2,
             enable_auto_relations: false,
             enable_contradiction_detection: false,
-            enable_llm_filter: true,
             filter_prompt: Some("technical documents only".to_string()),
         };
 
@@ -800,10 +783,7 @@ mod tests {
 
         assert_eq!(updated_doc.status, ProcessingStatus::Done);
         assert!(updated_doc.error_message.is_some());
-        assert!(updated_doc
-            .error_message
-            .unwrap()
-            .contains("Filtered:"));
+        assert!(updated_doc.error_message.unwrap().contains("Filtered:"));
         assert_eq!(updated_doc.chunk_count, 0);
     }
 
@@ -829,18 +809,12 @@ mod tests {
             .await;
 
         let embeddings_config = EmbeddingsConfig {
-            model: "openai/text-embedding-3-small".to_string(),
+            model: "BAAI/bge-small-en-v1.5".to_string(),
             dimensions: 384,
             batch_size: 8,
-            api_key: Some("test-key".to_string()),
-            base_url: Some(mock_server.uri()),
-            rate_limit: None,
-            timeout_secs: 5,
-            max_retries: 0,
         };
 
-        let embeddings = EmbeddingProvider::new_async(&embeddings_config)
-            .await
+        let embeddings = EmbeddingProvider::new(&embeddings_config)
             .expect("failed to create embeddings provider");
 
         let llm_config = LlmConfig {
@@ -854,7 +828,6 @@ mod tests {
             query_rewrite_timeout_secs: 2,
             enable_auto_relations: false,
             enable_contradiction_detection: false,
-            enable_llm_filter: true,
             filter_prompt: Some("technical documents only".to_string()),
         };
 
@@ -927,18 +900,12 @@ mod tests {
             .await;
 
         let embeddings_config = EmbeddingsConfig {
-            model: "openai/text-embedding-3-small".to_string(),
+            model: "BAAI/bge-small-en-v1.5".to_string(),
             dimensions: 384,
             batch_size: 8,
-            api_key: Some("test-key".to_string()),
-            base_url: Some(mock_server.uri()),
-            rate_limit: None,
-            timeout_secs: 5,
-            max_retries: 0,
         };
 
-        let embeddings = EmbeddingProvider::new_async(&embeddings_config)
-            .await
+        let embeddings = EmbeddingProvider::new(&embeddings_config)
             .expect("failed to create embeddings provider");
 
         let llm_config = LlmConfig {
@@ -952,7 +919,6 @@ mod tests {
             query_rewrite_timeout_secs: 2,
             enable_auto_relations: false,
             enable_contradiction_detection: false,
-            enable_llm_filter: false,
             filter_prompt: None,
         };
 
@@ -1025,18 +991,12 @@ mod tests {
             .await;
 
         let embeddings_config = EmbeddingsConfig {
-            model: "openai/text-embedding-3-small".to_string(),
+            model: "BAAI/bge-small-en-v1.5".to_string(),
             dimensions: 384,
             batch_size: 8,
-            api_key: Some("test-key".to_string()),
-            base_url: Some(mock_server.uri()),
-            rate_limit: None,
-            timeout_secs: 5,
-            max_retries: 0,
         };
 
-        let embeddings = EmbeddingProvider::new_async(&embeddings_config)
-            .await
+        let embeddings = EmbeddingProvider::new(&embeddings_config)
             .expect("failed to create embeddings provider");
 
         let llm = LlmProvider::unavailable("test unavailable");
@@ -1125,18 +1085,12 @@ mod tests {
             .await;
 
         let embeddings_config = EmbeddingsConfig {
-            model: "openai/text-embedding-3-small".to_string(),
+            model: "BAAI/bge-small-en-v1.5".to_string(),
             dimensions: 384,
             batch_size: 8,
-            api_key: Some("test-key".to_string()),
-            base_url: Some(mock_server.uri()),
-            rate_limit: None,
-            timeout_secs: 5,
-            max_retries: 0,
         };
 
-        let embeddings = EmbeddingProvider::new_async(&embeddings_config)
-            .await
+        let embeddings = EmbeddingProvider::new(&embeddings_config)
             .expect("failed to create embeddings provider");
 
         let llm_config = LlmConfig {
@@ -1150,7 +1104,6 @@ mod tests {
             query_rewrite_timeout_secs: 2,
             enable_auto_relations: false,
             enable_contradiction_detection: false,
-            enable_llm_filter: true,
             filter_prompt: Some("technical documents only".to_string()),
         };
 
@@ -1250,19 +1203,13 @@ mod tests {
             .await;
 
         let config = Config::default();
-        
+
         let embeddings_config = EmbeddingsConfig {
-            model: "openai/text-embedding-3-small".to_string(),
-            api_key: Some("test-key".to_string()),
-            base_url: Some(mock_server.uri()),
+            model: "BAAI/bge-small-en-v1.5".to_string(),
             dimensions: 384,
             batch_size: 8,
-            timeout_secs: 5,
-            max_retries: 0,
-            rate_limit: None,
         };
-        let embeddings = EmbeddingProvider::new_async(&embeddings_config)
-            .await
+        let embeddings = EmbeddingProvider::new(&embeddings_config)
             .expect("failed to create embedding provider");
 
         let ocr = OcrProvider::new(&config.ocr).expect("failed to create ocr provider");
@@ -1320,19 +1267,13 @@ mod tests {
             .await;
 
         let config = Config::default();
-        
+
         let embeddings_config = EmbeddingsConfig {
-            model: "openai/text-embedding-3-small".to_string(),
-            api_key: Some("test-key".to_string()),
-            base_url: Some(mock_server.uri()),
+            model: "BAAI/bge-small-en-v1.5".to_string(),
             dimensions: 384,
             batch_size: 8,
-            timeout_secs: 5,
-            max_retries: 0,
-            rate_limit: None,
         };
-        let embeddings = EmbeddingProvider::new_async(&embeddings_config)
-            .await
+        let embeddings = EmbeddingProvider::new(&embeddings_config)
             .expect("failed to create embedding provider");
 
         let ocr = OcrProvider::new(&config.ocr).expect("failed to create ocr provider");
@@ -1382,18 +1323,12 @@ mod tests {
             .await;
 
         let embeddings_config = EmbeddingsConfig {
-            model: "openai/text-embedding-3-small".to_string(),
+            model: "BAAI/bge-small-en-v1.5".to_string(),
             dimensions: 384,
             batch_size: 8,
-            api_key: Some("test-key".to_string()),
-            base_url: Some(mock_server.uri()),
-            rate_limit: None,
-            timeout_secs: 5,
-            max_retries: 0,
         };
 
-        let embeddings = EmbeddingProvider::new_async(&embeddings_config)
-            .await
+        let embeddings = EmbeddingProvider::new(&embeddings_config)
             .expect("failed to create embeddings provider");
 
         let config = Config::default();
@@ -1438,7 +1373,10 @@ mod tests {
 
         let result = pipeline.process_document(&doc.id).await;
 
-        assert!(result.is_err(), "Processing should fail with unavailable transcription provider");
+        assert!(
+            result.is_err(),
+            "Processing should fail with unavailable transcription provider"
+        );
 
         let updated_doc = backend
             .get_document_by_id(&doc.id)

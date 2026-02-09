@@ -366,10 +366,7 @@ impl InferenceEngine {
     ///
     /// We normalize the source set (sort + deduplicate) and compare against existing
     /// inference memories' `memory_relations` keys.
-    async fn check_inference_exists(
-        &self,
-        source_ids: &[String],
-    ) -> Result<bool> {
+    async fn check_inference_exists(&self, source_ids: &[String]) -> Result<bool> {
         self.db.check_inference_exists(source_ids).await
     }
 
@@ -390,39 +387,19 @@ mod tests {
 
     use super::*;
     use crate::config::{DatabaseConfig, EmbeddingsConfig, LlmConfig};
-    use crate::db::{Database, LibSqlBackend};
     use crate::db::repository::MemoryRepository;
+    use crate::db::{Database, LibSqlBackend};
 
     // ── Test helpers ──────────────────────────────────────────────────
 
-    async fn test_embeddings_provider() -> (EmbeddingProvider, MockServer) {
-        let mock_server = MockServer::start().await;
-        let embedding = vec![0.1_f32; 384];
-
-        Mock::given(method("POST"))
-            .and(path("/embeddings"))
-            .respond_with(ResponseTemplate::new(200).set_body_json(json!({
-                "data": [{ "embedding": embedding }]
-            })))
-            .mount(&mock_server)
-            .await;
-
+    async fn test_embeddings_provider() -> EmbeddingProvider {
         let config = EmbeddingsConfig {
-            model: "openai/text-embedding-3-small".to_string(),
+            model: "BAAI/bge-small-en-v1.5".to_string(),
             dimensions: 384,
             batch_size: 8,
-            api_key: Some("test-key".to_string()),
-            base_url: Some(mock_server.uri()),
-            rate_limit: None,
-            timeout_secs: 5,
-            max_retries: 0,
         };
 
-        let provider = EmbeddingProvider::new_async(&config)
-            .await
-            .expect("failed to create test embeddings provider");
-
-        (provider, mock_server)
+        EmbeddingProvider::new(&config).expect("failed to create test embeddings provider")
     }
 
     fn test_llm_unavailable() -> LlmProvider {
@@ -441,7 +418,6 @@ mod tests {
             query_rewrite_timeout_secs: 2,
             enable_auto_relations: false,
             enable_contradiction_detection: false,
-            enable_llm_filter: false,
             filter_prompt: None,
         };
 
@@ -675,7 +651,7 @@ mod tests {
     #[tokio::test]
     async fn test_run_once_returns_empty_when_llm_unavailable() {
         let (_conn, db, _temp_dir) = test_database().await;
-        let (embeddings, _mock) = test_embeddings_provider().await;
+        let embeddings = test_embeddings_provider().await;
         let engine = InferenceEngine::new(db, test_llm_unavailable(), embeddings, test_config());
 
         let stats = engine.run_once().await.expect("run_once should not fail");
@@ -689,7 +665,7 @@ mod tests {
         let llm_server = MockServer::start().await;
         // LLM mock that never gets called (no seeds to process)
         let (_conn, db, _temp_dir) = test_database().await;
-        let (embeddings, _emb_mock) = test_embeddings_provider().await;
+        let embeddings = test_embeddings_provider().await;
         let engine = InferenceEngine::new(
             db,
             test_llm_provider(llm_server.uri()),
@@ -721,7 +697,7 @@ mod tests {
             .await
             .unwrap();
 
-        let (embeddings, _mock) = test_embeddings_provider().await;
+        let embeddings = test_embeddings_provider().await;
         let engine = InferenceEngine::new(db, test_llm_unavailable(), embeddings, test_config());
 
         let seeds = engine.select_seed_memories().await.unwrap();
@@ -748,7 +724,7 @@ mod tests {
             .await
             .unwrap();
 
-        let (embeddings, _mock) = test_embeddings_provider().await;
+        let embeddings = test_embeddings_provider().await;
         let config = test_config(); // exclude_episodes = true
         let engine = InferenceEngine::new(db, test_llm_unavailable(), embeddings, config);
 
@@ -775,7 +751,7 @@ mod tests {
             .await
             .unwrap();
 
-        let (embeddings, _mock) = test_embeddings_provider().await;
+        let embeddings = test_embeddings_provider().await;
         let mut config = test_config();
         config.exclude_episodes = false;
         let engine = InferenceEngine::new(db, test_llm_unavailable(), embeddings, config);
@@ -793,7 +769,7 @@ mod tests {
         let inference = test_inference_memory("inf_1", "Existing inference", &["mem_a", "mem_b"]);
         MemoryRepository::create(&conn, &inference).await.unwrap();
 
-        let (embeddings, _mock) = test_embeddings_provider().await;
+        let embeddings = test_embeddings_provider().await;
         let engine = InferenceEngine::new(db, test_llm_unavailable(), embeddings, test_config());
 
         // Same source IDs (different order) should be detected as duplicate
@@ -812,7 +788,7 @@ mod tests {
         let inference = test_inference_memory("inf_1", "Existing inference", &["mem_a", "mem_b"]);
         MemoryRepository::create(&conn, &inference).await.unwrap();
 
-        let (embeddings, _mock) = test_embeddings_provider().await;
+        let embeddings = test_embeddings_provider().await;
         let engine = InferenceEngine::new(db, test_llm_unavailable(), embeddings, test_config());
 
         // Different source IDs should not be a duplicate
@@ -848,7 +824,7 @@ mod tests {
             .await
             .unwrap();
 
-        let (embeddings, _mock) = test_embeddings_provider().await;
+        let embeddings = test_embeddings_provider().await;
         let engine = InferenceEngine::new(db, test_llm_unavailable(), embeddings, test_config());
 
         let found = engine
@@ -876,22 +852,29 @@ mod tests {
             .await;
 
         let (conn, db, _temp_dir) = test_database().await;
+        let embeddings = test_embeddings_provider().await;
 
-        // Create seed and related memories with embeddings
+        // Create seed and related memories with real embeddings
         let seed = test_memory("mem_1", "User is a developer", Some("user_1"));
         MemoryRepository::create(&conn, &seed).await.unwrap();
-        let embedding = vec![0.1_f32; 384];
-        MemoryRepository::update_embedding(&conn, "mem_1", &embedding)
+        let seed_embedding = embeddings
+            .embed_passage("User is a developer")
+            .await
+            .unwrap();
+        MemoryRepository::update_embedding(&conn, "mem_1", &seed_embedding)
             .await
             .unwrap();
 
         let related = test_memory("mem_2", "User prefers dark mode", Some("user_1"));
         MemoryRepository::create(&conn, &related).await.unwrap();
-        MemoryRepository::update_embedding(&conn, "mem_2", &embedding)
+        let related_embedding = embeddings
+            .embed_passage("User prefers dark mode")
+            .await
+            .unwrap();
+        MemoryRepository::update_embedding(&conn, "mem_2", &related_embedding)
             .await
             .unwrap();
 
-        let (embeddings, _emb_mock) = test_embeddings_provider().await;
         let engine = InferenceEngine::new(
             Arc::clone(&db),
             test_llm_provider(llm_server.uri()),
@@ -936,21 +919,28 @@ mod tests {
             .await;
 
         let (conn, db, _temp_dir) = test_database().await;
+        let embeddings = test_embeddings_provider().await;
 
         let seed = test_memory("mem_1", "User mentioned something", Some("user_1"));
         MemoryRepository::create(&conn, &seed).await.unwrap();
-        let embedding = vec![0.1_f32; 384];
-        MemoryRepository::update_embedding(&conn, "mem_1", &embedding)
+        let seed_embedding = embeddings
+            .embed_passage("User mentioned something")
+            .await
+            .unwrap();
+        MemoryRepository::update_embedding(&conn, "mem_1", &seed_embedding)
             .await
             .unwrap();
 
         let related = test_memory("mem_2", "Another thing mentioned", Some("user_1"));
         MemoryRepository::create(&conn, &related).await.unwrap();
-        MemoryRepository::update_embedding(&conn, "mem_2", &embedding)
+        let related_embedding = embeddings
+            .embed_passage("Another thing mentioned")
+            .await
+            .unwrap();
+        MemoryRepository::update_embedding(&conn, "mem_2", &related_embedding)
             .await
             .unwrap();
 
-        let (embeddings, _emb_mock) = test_embeddings_provider().await;
         let engine = InferenceEngine::new(
             db,
             test_llm_provider(llm_server.uri()),
@@ -997,7 +987,7 @@ mod tests {
                 .unwrap();
         }
 
-        let (embeddings, _emb_mock) = test_embeddings_provider().await;
+        let embeddings = test_embeddings_provider().await;
         let engine =
             InferenceEngine::new(db, test_llm_provider(llm_server.uri()), embeddings, config);
 
@@ -1014,7 +1004,7 @@ mod tests {
             ..test_config()
         };
         let (_conn, db, _temp_dir) = test_database().await;
-        let (embeddings, _mock) = test_embeddings_provider().await;
+        let embeddings = test_embeddings_provider().await;
         let engine = InferenceEngine::new(db, test_llm_unavailable(), embeddings, config);
 
         assert_eq!(engine.interval_secs(), 42);

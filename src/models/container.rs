@@ -14,6 +14,7 @@ pub struct ContainerFilter {
 
 impl ContainerFilter {
     /// Create a new ContainerFilter with default settings
+    #[allow(dead_code)] // Public API constructor
     pub fn new(tag: String) -> Self {
         Self {
             tag,
@@ -23,6 +24,7 @@ impl ContainerFilter {
     }
 
     /// Create a ContainerFilter with LLM filtering enabled
+    #[allow(dead_code)] // Public API constructor
     pub fn with_llm_filter(tag: String, filter_prompt: String) -> Self {
         Self {
             tag,

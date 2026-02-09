@@ -52,7 +52,10 @@ impl ProfileRefreshManager {
             return Ok(0);
         }
 
-        debug!("Found {} container tags to check for profile refresh", tags.len());
+        debug!(
+            "Found {} container tags to check for profile refresh",
+            tags.len()
+        );
 
         let profile_generator = ProfileGenerator::new(self.llm.clone());
         let mut refreshed_count = 0u64;
@@ -62,10 +65,16 @@ impl ProfileRefreshManager {
             match self.refresh_tag(tag, &profile_generator).await {
                 Ok(true) => {
                     refreshed_count += 1;
-                    info!(container_tag = tag.as_str(), "Profile refreshed successfully");
+                    info!(
+                        container_tag = tag.as_str(),
+                        "Profile refreshed successfully"
+                    );
                 }
                 Ok(false) => {
-                    debug!(container_tag = tag.as_str(), "Profile is still fresh, skipping");
+                    debug!(
+                        container_tag = tag.as_str(),
+                        "Profile is still fresh, skipping"
+                    );
                 }
                 Err(e) => {
                     error_count += 1;
@@ -80,7 +89,9 @@ impl ProfileRefreshManager {
 
         info!(
             "Profile refresh complete: {} refreshed, {} errors out of {} tags",
-            refreshed_count, error_count, tags.len()
+            refreshed_count,
+            error_count,
+            tags.len()
         );
 
         Ok(refreshed_count)
@@ -184,12 +195,9 @@ impl ProfileRefreshManager {
 
         // Only upsert if we have at least one result
         if narrative.is_some() || summary.is_some() {
-            self.db.upsert_cached_profile(
-                container_tag,
-                narrative.as_deref(),
-                summary.as_deref(),
-            )
-            .await?;
+            self.db
+                .upsert_cached_profile(container_tag, narrative.as_deref(), summary.as_deref())
+                .await?;
             Ok(true)
         } else {
             warn!(

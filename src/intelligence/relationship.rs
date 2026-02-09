@@ -53,13 +53,13 @@ impl RelationshipDetector {
             }
         };
 
-        let candidates =
-            db.search_similar_memories(&embedding, 5, 0.7, container_tag, false)
-                .await?
-                .into_iter()
-                .filter(|hit| hit.memory.id != new_memory_id)
-                .map(|hit| hit.memory)
-                .collect::<Vec<_>>();
+        let candidates = db
+            .search_similar_memories(&embedding, 5, 0.7, container_tag, false)
+            .await?
+            .into_iter()
+            .filter(|hit| hit.memory.id != new_memory_id)
+            .map(|hit| hit.memory)
+            .collect::<Vec<_>>();
 
         if candidates.is_empty() {
             return Ok(empty_result());
@@ -158,42 +158,18 @@ mod tests {
 
     use super::*;
     use crate::config::{DatabaseConfig, EmbeddingsConfig, LlmConfig};
-    use crate::db::{Database, LibSqlBackend};
     use crate::db::repository::MemoryRepository;
+    use crate::db::{Database, LibSqlBackend};
     use crate::models::Memory;
 
-    async fn test_embeddings_provider() -> (EmbeddingProvider, MockServer) {
-        let mock_server = MockServer::start().await;
-        let embedding = vec![0.1_f32; 384];
-
-        Mock::given(method("POST"))
-            .and(path("/embeddings"))
-            .respond_with(ResponseTemplate::new(200).set_body_json(json!({
-                "data": [
-                    {
-                        "embedding": embedding
-                    }
-                ]
-            })))
-            .mount(&mock_server)
-            .await;
-
+    async fn test_embeddings_provider() -> EmbeddingProvider {
         let config = EmbeddingsConfig {
-            model: "openai/text-embedding-3-small".to_string(),
+            model: "BAAI/bge-small-en-v1.5".to_string(),
             dimensions: 384,
             batch_size: 8,
-            api_key: Some("test-key".to_string()),
-            base_url: Some(mock_server.uri()),
-            rate_limit: None,
-            timeout_secs: 5,
-            max_retries: 0,
         };
 
-        let provider = EmbeddingProvider::new_async(&config)
-            .await
-            .expect("failed to create test embeddings provider");
-
-        (provider, mock_server)
+        EmbeddingProvider::new(&config).expect("failed to create test embeddings provider")
     }
 
     fn test_llm_unavailable() -> LlmProvider {
@@ -212,7 +188,6 @@ mod tests {
             query_rewrite_timeout_secs: 2,
             enable_auto_relations: false,
             enable_contradiction_detection: false,
-            enable_llm_filter: false,
             filter_prompt: None,
         };
 
@@ -323,7 +298,7 @@ mod tests {
 
     #[tokio::test]
     async fn test_detect_returns_empty_when_llm_unavailable() {
-        let (embeddings, _embed_server) = test_embeddings_provider().await;
+        let embeddings = test_embeddings_provider().await;
         let detector = RelationshipDetector::new(test_llm_unavailable(), embeddings);
         let (db, _temp_dir) = test_database().await;
         let backend = LibSqlBackend::new(db);
@@ -347,8 +322,9 @@ mod tests {
             .mount(&llm_server)
             .await;
 
-        let (embeddings, _embed_server) = test_embeddings_provider().await;
-        let detector = RelationshipDetector::new(test_llm_provider(llm_server.uri()), embeddings);
+        let embeddings = test_embeddings_provider().await;
+        let detector =
+            RelationshipDetector::new(test_llm_provider(llm_server.uri()), embeddings.clone());
         let (db, _temp_dir) = test_database().await;
 
         let conn = db.connect().expect("connect should work");
@@ -356,7 +332,11 @@ mod tests {
         MemoryRepository::create(&conn, &memory)
             .await
             .expect("memory create should succeed");
-        let embedding = vec![0.1_f32; 384];
+        // Use a real embedding so cosine similarity with the query exceeds the 0.7 threshold
+        let embedding = embeddings
+            .embed_passage("User prefers light mode")
+            .await
+            .expect("embed should succeed");
         MemoryRepository::update_embedding(&conn, "mem_1", &embedding)
             .await
             .expect("embedding update should succeed");
@@ -391,8 +371,9 @@ mod tests {
             .mount(&llm_server)
             .await;
 
-        let (embeddings, _embed_server) = test_embeddings_provider().await;
-        let detector = RelationshipDetector::new(test_llm_provider(llm_server.uri()), embeddings);
+        let embeddings = test_embeddings_provider().await;
+        let detector =
+            RelationshipDetector::new(test_llm_provider(llm_server.uri()), embeddings.clone());
         let (db, _temp_dir) = test_database().await;
 
         let conn = db.connect().expect("connect should work");
@@ -400,7 +381,11 @@ mod tests {
         MemoryRepository::create(&conn, &memory)
             .await
             .expect("create should succeed");
-        MemoryRepository::update_embedding(&conn, "mem_1", &vec![0.1_f32; 384])
+        let real_embedding = embeddings
+            .embed_passage("User prefers light mode")
+            .await
+            .expect("embed should succeed");
+        MemoryRepository::update_embedding(&conn, "mem_1", &real_embedding)
             .await
             .expect("embedding update should succeed");
 
@@ -438,8 +423,9 @@ mod tests {
             .mount(&llm_server)
             .await;
 
-        let (embeddings, _embed_server) = test_embeddings_provider().await;
-        let detector = RelationshipDetector::new(test_llm_provider(llm_server.uri()), embeddings);
+        let embeddings = test_embeddings_provider().await;
+        let detector =
+            RelationshipDetector::new(test_llm_provider(llm_server.uri()), embeddings.clone());
         let (db, _temp_dir) = test_database().await;
 
         let conn = db.connect().expect("connect should work");
@@ -447,7 +433,11 @@ mod tests {
         MemoryRepository::create(&conn, &memory)
             .await
             .expect("create should succeed");
-        MemoryRepository::update_embedding(&conn, "mem_1", &vec![0.1_f32; 384])
+        let real_embedding = embeddings
+            .embed_passage("User is a developer")
+            .await
+            .expect("embed should succeed");
+        MemoryRepository::update_embedding(&conn, "mem_1", &real_embedding)
             .await
             .expect("embedding update should succeed");
 
@@ -477,7 +467,7 @@ mod tests {
 
     #[tokio::test]
     async fn test_detect_no_heuristic_backward_compat() {
-        let (embeddings, _embed_server) = test_embeddings_provider().await;
+        let embeddings = test_embeddings_provider().await;
         let detector = RelationshipDetector::new(test_llm_unavailable(), embeddings);
         let (db, _temp_dir) = test_database().await;
         let backend = LibSqlBackend::new(db);

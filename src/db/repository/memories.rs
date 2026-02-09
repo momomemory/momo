@@ -95,8 +95,10 @@ impl MemoryRepository {
                     memory_type, last_accessed, confidence, metadata, created_at, updated_at \
              FROM memories WHERE id IN ({placeholders}) AND is_forgotten = 0"
         );
-        let params: Vec<libsql::Value> =
-            ids.iter().map(|id| libsql::Value::from(id.clone())).collect();
+        let params: Vec<libsql::Value> = ids
+            .iter()
+            .map(|id| libsql::Value::from(id.clone()))
+            .collect();
 
         let mut rows = conn.query(&sql, libsql::params_from_iter(params)).await?;
         let mut results = Vec::new();
@@ -551,9 +553,8 @@ impl MemoryRepository {
         new_relations: std::collections::HashMap<String, crate::models::MemoryRelationType>,
     ) -> Result<()> {
         let existing = Self::get_by_id(conn, id).await?;
-        let memory = existing.ok_or_else(|| {
-            crate::error::MomoError::NotFound(format!("Memory not found: {id}"))
-        })?;
+        let memory = existing
+            .ok_or_else(|| crate::error::MomoError::NotFound(format!("Memory not found: {id}")))?;
 
         let mut merged_relations = memory.memory_relations.clone();
         for (related_id, relation_type) in new_relations {
@@ -615,7 +616,10 @@ impl MemoryRepository {
         Ok(results)
     }
 
-    async fn get_source_documents(conn: &Connection, memory_ids: &[String]) -> Result<(Vec<Document>, Vec<GraphEdge>)> {
+    async fn get_source_documents(
+        conn: &Connection,
+        memory_ids: &[String],
+    ) -> Result<(Vec<Document>, Vec<GraphEdge>)> {
         if memory_ids.is_empty() {
             return Ok((Vec::new(), Vec::new()));
         }
@@ -633,7 +637,10 @@ impl MemoryRepository {
             "SELECT memory_id, document_id FROM memory_sources WHERE memory_id IN ({placeholders})"
         );
 
-        let params: Vec<libsql::Value> = memory_ids.iter().map(|id| libsql::Value::from(id.clone())).collect();
+        let params: Vec<libsql::Value> = memory_ids
+            .iter()
+            .map(|id| libsql::Value::from(id.clone()))
+            .collect();
         let mut rows = conn.query(&sql, libsql::params_from_iter(params)).await?;
 
         let mut edges = Vec::new();
@@ -1100,8 +1107,7 @@ mod tests {
 
         for i in 1..=3 {
             let id = format!("e{i}");
-            let mut memory =
-                Memory::new(id.clone(), format!("Episode {i}"), "space1".to_string());
+            let mut memory = Memory::new(id.clone(), format!("Episode {i}"), "space1".to_string());
             memory.memory_type = crate::models::MemoryType::Episode;
             MemoryRepository::create(&conn, &memory).await.unwrap();
         }
@@ -1466,12 +1472,10 @@ mod tests {
             .insert("s1".to_string(), MemoryRelationType::Derives);
         MemoryRepository::create(&conn, &inf2).await.unwrap();
 
-        let exists = MemoryRepository::check_inference_exists(
-            &conn,
-            &["s1".to_string(), "s2".to_string()],
-        )
-        .await
-        .unwrap();
+        let exists =
+            MemoryRepository::check_inference_exists(&conn, &["s1".to_string(), "s2".to_string()])
+                .await
+                .unwrap();
         assert!(exists);
 
         let not_exists = MemoryRepository::check_inference_exists(&conn, &["s3".to_string()])
@@ -1523,10 +1527,18 @@ mod tests {
     async fn test_update_version_chain_sets_fields() {
         let conn = setup_test_db().await;
 
-        let old = Memory::new("old1".to_string(), "Old memory".to_string(), "space1".to_string());
+        let old = Memory::new(
+            "old1".to_string(),
+            "Old memory".to_string(),
+            "space1".to_string(),
+        );
         MemoryRepository::create(&conn, &old).await.unwrap();
 
-        let new_mem = Memory::new("new1".to_string(), "New memory".to_string(), "space1".to_string());
+        let new_mem = Memory::new(
+            "new1".to_string(),
+            "New memory".to_string(),
+            "space1".to_string(),
+        );
         MemoryRepository::create(&conn, &new_mem).await.unwrap();
 
         MemoryRepository::update_version_chain(&conn, "new1", "old1", "old1", 2)
@@ -1546,26 +1558,44 @@ mod tests {
     async fn test_update_version_chain_preserves_root_across_generations() {
         let conn = setup_test_db().await;
 
-        let v1 = Memory::new("v1".to_string(), "Version 1".to_string(), "space1".to_string());
+        let v1 = Memory::new(
+            "v1".to_string(),
+            "Version 1".to_string(),
+            "space1".to_string(),
+        );
         MemoryRepository::create(&conn, &v1).await.unwrap();
 
-        let v2 = Memory::new("v2".to_string(), "Version 2".to_string(), "space1".to_string());
+        let v2 = Memory::new(
+            "v2".to_string(),
+            "Version 2".to_string(),
+            "space1".to_string(),
+        );
         MemoryRepository::create(&conn, &v2).await.unwrap();
 
         MemoryRepository::update_version_chain(&conn, "v2", "v1", "v1", 2)
             .await
             .unwrap();
 
-        let v3 = Memory::new("v3".to_string(), "Version 3".to_string(), "space1".to_string());
+        let v3 = Memory::new(
+            "v3".to_string(),
+            "Version 3".to_string(),
+            "space1".to_string(),
+        );
         MemoryRepository::create(&conn, &v3).await.unwrap();
 
-        let v2_mem = MemoryRepository::get_by_id(&conn, "v2").await.unwrap().unwrap();
+        let v2_mem = MemoryRepository::get_by_id(&conn, "v2")
+            .await
+            .unwrap()
+            .unwrap();
         let root = v2_mem.root_memory_id.unwrap_or_else(|| v2_mem.id.clone());
         MemoryRepository::update_version_chain(&conn, "v3", "v2", &root, v2_mem.version + 1)
             .await
             .unwrap();
 
-        let v3_mem = MemoryRepository::get_by_id(&conn, "v3").await.unwrap().unwrap();
+        let v3_mem = MemoryRepository::get_by_id(&conn, "v3")
+            .await
+            .unwrap()
+            .unwrap();
         assert_eq!(v3_mem.parent_memory_id.as_deref(), Some("v2"));
         assert_eq!(v3_mem.root_memory_id.as_deref(), Some("v1"));
         assert_eq!(v3_mem.version, 3);
@@ -1593,7 +1623,11 @@ mod tests {
     async fn test_get_by_ids_empty_input() {
         let conn = setup_test_db().await;
 
-        let mem = Memory::new("m1".to_string(), "Memory 1".to_string(), "space1".to_string());
+        let mem = Memory::new(
+            "m1".to_string(),
+            "Memory 1".to_string(),
+            "space1".to_string(),
+        );
         MemoryRepository::create(&conn, &mem).await.unwrap();
 
         let results = MemoryRepository::get_by_ids(&conn, &[]).await.unwrap();
@@ -1604,11 +1638,21 @@ mod tests {
     async fn test_get_by_ids_excludes_forgotten() {
         let conn = setup_test_db().await;
 
-        let mem = Memory::new("m1".to_string(), "Memory 1".to_string(), "space1".to_string());
+        let mem = Memory::new(
+            "m1".to_string(),
+            "Memory 1".to_string(),
+            "space1".to_string(),
+        );
         MemoryRepository::create(&conn, &mem).await.unwrap();
-        MemoryRepository::forget(&conn, "m1", Some("test")).await.unwrap();
+        MemoryRepository::forget(&conn, "m1", Some("test"))
+            .await
+            .unwrap();
 
-        let mem2 = Memory::new("m2".to_string(), "Memory 2".to_string(), "space1".to_string());
+        let mem2 = Memory::new(
+            "m2".to_string(),
+            "Memory 2".to_string(),
+            "space1".to_string(),
+        );
         MemoryRepository::create(&conn, &mem2).await.unwrap();
 
         let ids = vec!["m1".to_string(), "m2".to_string()];
@@ -1630,7 +1674,11 @@ mod tests {
     async fn test_get_by_ids_partial_match() {
         let conn = setup_test_db().await;
 
-        let mem = Memory::new("m1".to_string(), "Memory 1".to_string(), "space1".to_string());
+        let mem = Memory::new(
+            "m1".to_string(),
+            "Memory 1".to_string(),
+            "space1".to_string(),
+        );
         MemoryRepository::create(&conn, &mem).await.unwrap();
 
         let ids = vec!["m1".to_string(), "missing".to_string()];

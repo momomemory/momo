@@ -7,8 +7,8 @@ use wiremock::matchers::{method, path};
 use wiremock::{Mock, MockServer, ResponseTemplate};
 
 use momo::config::{DatabaseConfig, LlmConfig};
-use momo::db::{Database, LibSqlBackend};
 use momo::db::repository::MemoryRepository;
+use momo::db::{Database, LibSqlBackend};
 use momo::llm::LlmProvider;
 use momo::models::{Memory, MemoryType};
 use momo::services::ProfileRefreshManager;
@@ -103,7 +103,6 @@ fn test_llm_provider(base_url: String) -> LlmProvider {
         query_rewrite_timeout_secs: 2,
         enable_auto_relations: false,
         enable_contradiction_detection: false,
-        enable_llm_filter: false,
         filter_prompt: None,
     };
 
@@ -149,10 +148,7 @@ async fn seed_memories(db: &Database, container_tag: &str, facts: &[(&str, &str,
 async fn mount_profile_llm_mock(mock_server: &MockServer, narrative: &str, compacted: &str) {
     Mock::given(method("POST"))
         .and(path("/chat/completions"))
-        .respond_with(
-            ResponseTemplate::new(200)
-                .set_body_json(llm_response(narrative)),
-        )
+        .respond_with(ResponseTemplate::new(200).set_body_json(llm_response(narrative)))
         .up_to_n_times(1)
         .expect(1)
         .mount(mock_server)
@@ -160,10 +156,7 @@ async fn mount_profile_llm_mock(mock_server: &MockServer, narrative: &str, compa
 
     Mock::given(method("POST"))
         .and(path("/chat/completions"))
-        .respond_with(
-            ResponseTemplate::new(200)
-                .set_body_json(llm_response(compacted)),
-        )
+        .respond_with(ResponseTemplate::new(200).set_body_json(llm_response(compacted)))
         .up_to_n_times(1)
         .expect(1)
         .mount(mock_server)
@@ -216,13 +209,11 @@ async fn profile_refresh_e2e_creates_cached_profile() {
     let profile = cached.unwrap();
     assert_eq!(profile.container_tag, "user_1");
     assert!(profile.narrative.is_some());
-    assert!(
-        profile
-            .narrative
-            .as_ref()
-            .unwrap()
-            .contains("Rust developer"),
-    );
+    assert!(profile
+        .narrative
+        .as_ref()
+        .unwrap()
+        .contains("Rust developer"),);
     assert!(profile.summary.is_some());
     assert!(profile.cached_at.is_some());
 }
@@ -240,12 +231,7 @@ async fn profile_refresh_skips_fresh_cache() {
 
     let (db, _temp_dir) = test_database().await;
 
-    seed_memories(
-        &db,
-        "user_2",
-        &[("m1", "User likes Python", true)],
-    )
-    .await;
+    seed_memories(&db, "user_2", &[("m1", "User likes Python", true)]).await;
 
     let llm = test_llm_provider(mock_server.uri());
     let manager = ProfileRefreshManager::new(Arc::new(LibSqlBackend::new(db.clone())), llm, 3600);
@@ -256,9 +242,10 @@ async fn profile_refresh_skips_fresh_cache() {
     let mock_server2 = MockServer::start().await;
     Mock::given(method("POST"))
         .and(path("/chat/completions"))
-        .respond_with(ResponseTemplate::new(200).set_body_json(llm_response(
-            r#"{"narrative": "Should not be called"}"#,
-        )))
+        .respond_with(
+            ResponseTemplate::new(200)
+                .set_body_json(llm_response(r#"{"narrative": "Should not be called"}"#)),
+        )
         .expect(0)
         .mount(&mock_server2)
         .await;
@@ -266,7 +253,10 @@ async fn profile_refresh_skips_fresh_cache() {
     let llm2 = test_llm_provider(mock_server2.uri());
     let manager2 = ProfileRefreshManager::new(Arc::new(LibSqlBackend::new(db.clone())), llm2, 3600);
 
-    let refreshed2 = manager2.run_once().await.expect("second run should succeed");
+    let refreshed2 = manager2
+        .run_once()
+        .await
+        .expect("second run should succeed");
     assert_eq!(refreshed2, 0, "Fresh cache should not be re-generated");
 }
 
@@ -282,12 +272,7 @@ async fn profile_refresh_updates_stale_cache() {
 
     let (db, _temp_dir) = test_database().await;
 
-    seed_memories(
-        &db,
-        "user_3",
-        &[("m1", "User programs in Go", true)],
-    )
-    .await;
+    seed_memories(&db, "user_3", &[("m1", "User programs in Go", true)]).await;
 
     let llm1 = test_llm_provider(mock_server1.uri());
     let manager1 = ProfileRefreshManager::new(Arc::new(LibSqlBackend::new(db.clone())), llm1, 3600);
@@ -302,12 +287,7 @@ async fn profile_refresh_updates_stale_cache() {
     assert!(initial.narrative.as_ref().unwrap().contains("Go developer"));
 
     tokio::time::sleep(std::time::Duration::from_millis(50)).await;
-    seed_memories(
-        &db,
-        "user_3",
-        &[("m2", "User also programs in Rust", true)],
-    )
-    .await;
+    seed_memories(&db, "user_3", &[("m2", "User also programs in Rust", true)]).await;
 
     let mock_server2 = MockServer::start().await;
     mount_profile_llm_mock(
@@ -319,16 +299,17 @@ async fn profile_refresh_updates_stale_cache() {
 
     let llm2 = test_llm_provider(mock_server2.uri());
     let manager2 = ProfileRefreshManager::new(Arc::new(LibSqlBackend::new(db.clone())), llm2, 3600);
-    let refreshed2 = manager2.run_once().await.expect("second run should succeed");
+    let refreshed2 = manager2
+        .run_once()
+        .await
+        .expect("second run should succeed");
     assert_eq!(refreshed2, 1, "Stale profile should be re-generated");
 
     let updated = MemoryRepository::get_cached_profile(&conn, "user_3")
         .await
         .unwrap()
         .expect("cache should still exist");
-    assert!(
-        updated.narrative.as_ref().unwrap().contains("Go and Rust"),
-    );
+    assert!(updated.narrative.as_ref().unwrap().contains("Go and Rust"),);
     assert_ne!(initial.cached_at, updated.cached_at);
 }
 
@@ -336,12 +317,7 @@ async fn profile_refresh_updates_stale_cache() {
 async fn profile_refresh_graceful_when_llm_unavailable() {
     let (db, _temp_dir) = test_database().await;
 
-    seed_memories(
-        &db,
-        "user_4",
-        &[("m1", "User likes TypeScript", true)],
-    )
-    .await;
+    seed_memories(&db, "user_4", &[("m1", "User likes TypeScript", true)]).await;
 
     let llm = LlmProvider::unavailable("test: LLM not configured");
     let manager = ProfileRefreshManager::new(Arc::new(LibSqlBackend::new(db.clone())), llm, 3600);
@@ -364,9 +340,10 @@ async fn profile_refresh_handles_empty_db() {
     let mock_server = MockServer::start().await;
     Mock::given(method("POST"))
         .and(path("/chat/completions"))
-        .respond_with(ResponseTemplate::new(200).set_body_json(llm_response(
-            r#"{"narrative": "Should not be called"}"#,
-        )))
+        .respond_with(
+            ResponseTemplate::new(200)
+                .set_body_json(llm_response(r#"{"narrative": "Should not be called"}"#)),
+        )
         .expect(0)
         .mount(&mock_server)
         .await;
@@ -389,12 +366,9 @@ async fn profile_refresh_multiple_container_tags() {
     for _ in 0..2 {
         Mock::given(method("POST"))
             .and(path("/chat/completions"))
-            .respond_with(
-                ResponseTemplate::new(200)
-                    .set_body_json(llm_response(
-                        r#"{"narrative": "A user profile narrative."}"#,
-                    )),
-            )
+            .respond_with(ResponseTemplate::new(200).set_body_json(llm_response(
+                r#"{"narrative": "A user profile narrative."}"#,
+            )))
             .up_to_n_times(1)
             .mount(&mock_server)
             .await;
@@ -403,9 +377,7 @@ async fn profile_refresh_multiple_container_tags() {
             .and(path("/chat/completions"))
             .respond_with(
                 ResponseTemplate::new(200)
-                    .set_body_json(llm_response(
-                        r#"{"General": ["Some fact"]}"#,
-                    )),
+                    .set_body_json(llm_response(r#"{"General": ["Some fact"]}"#)),
             )
             .up_to_n_times(1)
             .mount(&mock_server)
@@ -449,12 +421,9 @@ async fn profile_refresh_continues_on_individual_tag_failure() {
 
     Mock::given(method("POST"))
         .and(path("/chat/completions"))
-        .respond_with(
-            ResponseTemplate::new(200)
-                .set_body_json(llm_response(
-                    r#"{"narrative": "Bob is a Python developer."}"#,
-                )),
-        )
+        .respond_with(ResponseTemplate::new(200).set_body_json(llm_response(
+            r#"{"narrative": "Bob is a Python developer."}"#,
+        )))
         .up_to_n_times(1)
         .mount(&mock_server)
         .await;
@@ -463,9 +432,7 @@ async fn profile_refresh_continues_on_individual_tag_failure() {
         .and(path("/chat/completions"))
         .respond_with(
             ResponseTemplate::new(200)
-                .set_body_json(llm_response(
-                    r#"{"Technical": ["Uses Python"]}"#,
-                )),
+                .set_body_json(llm_response(r#"{"Technical": ["Uses Python"]}"#)),
         )
         .up_to_n_times(1)
         .mount(&mock_server)
@@ -479,7 +446,10 @@ async fn profile_refresh_continues_on_individual_tag_failure() {
     let llm = test_llm_provider(mock_server.uri());
     let manager = ProfileRefreshManager::new(Arc::new(LibSqlBackend::new(db.clone())), llm, 3600);
 
-    let refreshed = manager.run_once().await.expect("should not crash on partial failure");
+    let refreshed = manager
+        .run_once()
+        .await
+        .expect("should not crash on partial failure");
 
     let conn = db.connect().unwrap();
     let success_cache = MemoryRepository::get_cached_profile(&conn, "zzz_success")

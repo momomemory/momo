@@ -30,7 +30,7 @@ use std::sync::Arc;
 
 use crate::api::{create_router, AppState};
 use crate::config::Config;
-use crate::db::{Database, LibSqlBackend, DatabaseBackend};
+use crate::db::{Database, DatabaseBackend, LibSqlBackend};
 use crate::embeddings::{EmbeddingProvider, RerankerProvider};
 use crate::intelligence::InferenceEngine;
 use crate::llm::LlmProvider;

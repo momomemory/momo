@@ -1,12 +1,12 @@
 use momo::api::create_router;
 use momo::config::{Config, DatabaseConfig, EmbeddingsConfig, LlmConfig};
+use momo::db::repository::{DocumentRepository, MemoryRepository, MemorySourcesRepository};
 use momo::db::{Database, DatabaseBackend, LibSqlBackend};
-use momo::db::repository::{MemoryRepository, MemorySourcesRepository, DocumentRepository};
 use momo::embeddings::EmbeddingProvider;
 use momo::llm::LlmProvider;
+use momo::models::{Document, Memory, MemoryRelationType};
 use momo::ocr::OcrProvider;
 use momo::transcription::TranscriptionProvider;
-use momo::models::{Memory, MemoryRelationType, Document};
 use serde_json::json;
 use std::net::SocketAddr;
 use std::sync::Arc;
@@ -52,15 +52,12 @@ async fn setup_test_app() -> (SocketAddr, TempDir, MockServer, Database) {
         local_path: None,
     };
 
+    config.server.api_keys = vec!["test-key".to_string()];
+
     config.embeddings = EmbeddingsConfig {
-        model: "openai/text-embedding-3-small".to_string(),
+        model: "BAAI/bge-small-en-v1.5".to_string(),
         dimensions: 384,
         batch_size: 8,
-        api_key: Some("test-key".to_string()),
-        base_url: Some(mock_server.uri()),
-        rate_limit: None,
-        timeout_secs: 5,
-        max_retries: 0,
     };
 
     config.llm = Some(LlmConfig {
@@ -74,7 +71,6 @@ async fn setup_test_app() -> (SocketAddr, TempDir, MockServer, Database) {
         query_rewrite_timeout_secs: 2,
         enable_auto_relations: false,
         enable_contradiction_detection: false,
-        enable_llm_filter: false,
         filter_prompt: None,
     });
 
@@ -82,11 +78,11 @@ async fn setup_test_app() -> (SocketAddr, TempDir, MockServer, Database) {
         .await
         .expect("Failed to create database");
     let db_backend: Arc<dyn DatabaseBackend> = Arc::new(LibSqlBackend::new(db.clone()));
-    let embeddings = EmbeddingProvider::new_async(&config.embeddings)
-        .await
-        .expect("Failed to create embeddings");
+    let embeddings =
+        EmbeddingProvider::new(&config.embeddings).expect("Failed to create embeddings");
     let ocr = OcrProvider::new(&config.ocr).expect("Failed to create OCR");
-    let transcription = TranscriptionProvider::new(&config.transcription).expect("Failed to create transcription");
+    let transcription =
+        TranscriptionProvider::new(&config.transcription).expect("Failed to create transcription");
     let llm = LlmProvider::new(config.llm.as_ref());
 
     let state = momo::api::AppState::new(
@@ -121,45 +117,79 @@ async fn test_graph_endpoints_return_expected_nodes_and_edges() {
     // Prepare DB: create three memories with relations and one document source
     let conn = db.connect().expect("connect");
 
-    let mut m1 = Memory::new("m1".to_string(), "Memory 1".to_string(), "space1".to_string());
+    let mut m1 = Memory::new(
+        "m1".to_string(),
+        "Memory 1".to_string(),
+        "space1".to_string(),
+    );
     m1.container_tag = Some("graph_test".to_string());
-    m1.memory_relations.insert("m2".to_string(), MemoryRelationType::Updates);
+    m1.memory_relations
+        .insert("m2".to_string(), MemoryRelationType::Updates);
 
-    let mut m2 = Memory::new("m2".to_string(), "Memory 2".to_string(), "space1".to_string());
+    let mut m2 = Memory::new(
+        "m2".to_string(),
+        "Memory 2".to_string(),
+        "space1".to_string(),
+    );
     m2.container_tag = Some("graph_test".to_string());
-    m2.memory_relations.insert("m3".to_string(), MemoryRelationType::Extends);
+    m2.memory_relations
+        .insert("m3".to_string(), MemoryRelationType::Extends);
 
-    let mut m3 = Memory::new("m3".to_string(), "Memory 3".to_string(), "space1".to_string());
+    let mut m3 = Memory::new(
+        "m3".to_string(),
+        "Memory 3".to_string(),
+        "space1".to_string(),
+    );
     m3.container_tag = Some("graph_test".to_string());
 
-    MemoryRepository::create(&conn, &m1).await.expect("create m1");
-    MemoryRepository::create(&conn, &m2).await.expect("create m2");
-    MemoryRepository::create(&conn, &m3).await.expect("create m3");
+    MemoryRepository::create(&conn, &m1)
+        .await
+        .expect("create m1");
+    MemoryRepository::create(&conn, &m2)
+        .await
+        .expect("create m2");
+    MemoryRepository::create(&conn, &m3)
+        .await
+        .expect("create m3");
 
     // Create a document and link as source for m1
     let mut doc = Document::new("doc1".to_string());
     doc.title = Some("Doc 1".to_string());
-    DocumentRepository::create(&conn, &doc).await.expect("create doc");
+    DocumentRepository::create(&conn, &doc)
+        .await
+        .expect("create doc");
     MemorySourcesRepository::create(&conn, "m1", "doc1", None)
         .await
         .expect("create memory source");
 
-    // Call memory neighborhood graph
+    // Call memory neighborhood graph (v1 API)
     let res = client
-        .get(format!("{base_url}/v4/memories/m1/graph?depth=2&max_nodes=50"))
+        .get(format!(
+            "{base_url}/api/v1/memories/m1/graph?depth=2&maxNodes=50"
+        ))
+        .header("Authorization", "Bearer test-key")
         .send()
         .await
         .expect("request");
-    assert!(res.status().is_success(), "status is success");
+    let status = res.status();
     let body: serde_json::Value = res.json().await.expect("parse json");
+    assert!(
+        status.is_success(),
+        "status is success, got {status}: {body}"
+    );
 
-    // Debug: print full response to help inspect edge `type` serialization
-    // Debug output retained for now; safe to remove once serialization format is confirmed.
-    println!("GRAPH RESPONSE: {}", serde_json::to_string_pretty(&body).unwrap());
+    // v1 wraps response in {"data": {...}}
+    let data = body.get("data").expect("data envelope");
 
     // Basic shape checks
-    let nodes = body.get("nodes").and_then(|v| v.as_array()).expect("nodes array");
-    let edges = body.get("edges").and_then(|v| v.as_array()).expect("edges array");
+    let nodes = data
+        .get("nodes")
+        .and_then(|v| v.as_array())
+        .expect("nodes array");
+    let edges = data
+        .get("links")
+        .and_then(|v| v.as_array())
+        .expect("links array");
 
     // Expect at least three memories and one document
     let ids: Vec<String> = nodes
@@ -183,8 +213,7 @@ async fn test_graph_endpoints_return_expected_nodes_and_edges() {
         if source == "m1" && target == "m2" && etype == "updates" {
             found_updates = true;
         }
-        if source == "m2" && target == "m3" && (etype == "relates_to" || etype == "relatesto") {
-            // tolerate current API serialization which returns "relatesto"
+        if source == "m2" && target == "m3" && etype == "relatesTo" {
             found_extends = true;
         }
         if source == "m1" && target == "doc1" && etype == "sources" {
@@ -196,15 +225,22 @@ async fn test_graph_endpoints_return_expected_nodes_and_edges() {
     assert!(found_extends, "found relates_to edge m2->m3");
     assert!(found_source, "found source edge m1->doc1");
 
-    // Container-level graph
+    // Container-level graph (v1 API)
     let res2 = client
-        .get(format!("{base_url}/v4/containers/graph_test/graph?max_nodes=100"))
+        .get(format!(
+            "{base_url}/api/v1/containers/graph_test/graph?maxNodes=100"
+        ))
+        .header("Authorization", "Bearer test-key")
         .send()
         .await
         .expect("request2");
     assert!(res2.status().is_success());
     let body2: serde_json::Value = res2.json().await.expect("parse json2");
-    let nodes2 = body2.get("nodes").and_then(|v| v.as_array()).expect("nodes2");
+    let data2 = body2.get("data").expect("data envelope");
+    let nodes2 = data2
+        .get("nodes")
+        .and_then(|v| v.as_array())
+        .expect("nodes2");
     let ids2: Vec<String> = nodes2
         .iter()
         .filter_map(|n| n.get("id").and_then(|s| s.as_str()).map(|s| s.to_string()))

@@ -1,4 +1,3 @@
-use chrono::{DateTime, Utc};
 use libsql::{params, Connection};
 
 use crate::error::Result;
@@ -104,9 +103,7 @@ impl ChunkRepository {
     ) -> Result<Vec<ChunkWithDocument>> {
         let embedding_json = serde_json::to_string(embedding)?;
 
-        let has_tags = container_tags
-            .map(|t| !t.is_empty())
-            .unwrap_or(false);
+        let has_tags = container_tags.map(|t| !t.is_empty()).unwrap_or(false);
 
         let (query, tag_values) = if has_tags {
             let tags = container_tags.unwrap();

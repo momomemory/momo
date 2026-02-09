@@ -40,6 +40,7 @@ impl MemoryService {
         }
     }
 
+    #[allow(dead_code)]
     pub async fn create_memory(
         &self,
         content: &str,
@@ -57,6 +58,7 @@ impl MemoryService {
         .await
     }
 
+    #[allow(dead_code)]
     pub async fn create_inferred_memory(
         &self,
         content: &str,
@@ -127,7 +129,9 @@ impl MemoryService {
         };
 
         self.db.create_memory(&memory).await?;
-        self.db.update_memory_embedding(&memory.id, &embedding).await?;
+        self.db
+            .update_memory_embedding(&memory.id, &embedding)
+            .await?;
 
         let llm_config = Config::from_env().llm;
         if llm_config
@@ -200,40 +204,40 @@ impl MemoryService {
                             }
                         };
 
-                    if let Err(error) = db.add_memory_relation(
-                        &memory_id,
-                        &classification.memory_id,
-                        relation_type.clone(),
-                    )
-                    .await
+                    if let Err(error) = db
+                        .add_memory_relation(
+                            &memory_id,
+                            &classification.memory_id,
+                            relation_type.clone(),
+                        )
+                        .await
                     {
                         tracing::error!(error = %error, "Failed to add relation for new memory");
                     }
 
-                    if let Err(error) = db.add_memory_relation(
-                        &classification.memory_id,
-                        &memory_id,
-                        relation_type.clone(),
-                    )
-                    .await
+                    if let Err(error) = db
+                        .add_memory_relation(
+                            &classification.memory_id,
+                            &memory_id,
+                            relation_type.clone(),
+                        )
+                        .await
                     {
                         tracing::error!(error = %error, "Failed to add relation for related memory");
                     }
 
                     if relation_type == MemoryRelationType::Updates {
-                        if let Err(error) =
-                            db.update_memory_to_not_latest(&classification.memory_id)
-                                .await
+                        if let Err(error) = db
+                            .update_memory_to_not_latest(&classification.memory_id)
+                            .await
                         {
                             tracing::error!(error = %error, "Failed to mark related memory not latest");
                         }
 
                         match db.get_memory_by_id(&classification.memory_id).await {
                             Ok(Some(old)) => {
-                                let root_id = old
-                                    .root_memory_id
-                                    .clone()
-                                    .unwrap_or_else(|| old.id.clone());
+                                let root_id =
+                                    old.root_memory_id.clone().unwrap_or_else(|| old.id.clone());
                                 let new_version = old.version + 1;
                                 if let Err(error) = db
                                     .update_memory_version_chain(
@@ -269,7 +273,9 @@ impl MemoryService {
         let existing = if let Some(ref id) = req.id {
             self.db.get_memory_by_id(id).await?
         } else if let Some(ref content) = req.content {
-            self.db.get_memory_by_content(content, &req.container_tag).await?
+            self.db
+                .get_memory_by_content(content, &req.container_tag)
+                .await?
         } else {
             return Err(MomoError::Validation(
                 "Either id or content must be provided".to_string(),
@@ -320,7 +326,9 @@ impl MemoryService {
         };
 
         self.db.create_memory(&new_memory).await?;
-        self.db.update_memory_embedding(&new_memory.id, &new_embedding).await?;
+        self.db
+            .update_memory_embedding(&new_memory.id, &new_embedding)
+            .await?;
 
         Ok(UpdateMemoryResponse {
             id: new_memory.id,
@@ -336,7 +344,9 @@ impl MemoryService {
         let existing = if let Some(ref id) = req.id {
             self.db.get_memory_by_id(id).await?
         } else if let Some(ref content) = req.content {
-            self.db.get_memory_by_content(content, &req.container_tag).await?
+            self.db
+                .get_memory_by_content(content, &req.container_tag)
+                .await?
         } else {
             return Err(MomoError::Validation(
                 "Either id or content must be provided".to_string(),
@@ -346,7 +356,9 @@ impl MemoryService {
         let existing =
             existing.ok_or_else(|| MomoError::NotFound("Memory not found".to_string()))?;
 
-        self.db.forget_memory(&existing.id, req.reason.as_deref()).await?;
+        self.db
+            .forget_memory(&existing.id, req.reason.as_deref())
+            .await?;
 
         Ok(ForgetMemoryResponse {
             id: existing.id,
@@ -361,12 +373,14 @@ impl MemoryService {
     ) -> Result<ProfileResponse> {
         let cached = self.db.get_cached_profile(&req.container_tag).await?;
 
-        let mut profile = self.db.get_user_profile(
-            &req.container_tag,
-            req.include_dynamic.unwrap_or(true),
-            req.limit.unwrap_or(50),
-        )
-        .await?;
+        let mut profile = self
+            .db
+            .get_user_profile(
+                &req.container_tag,
+                req.include_dynamic.unwrap_or(true),
+                req.limit.unwrap_or(50),
+            )
+            .await?;
 
         let is_stale = match &cached {
             Some(c) => match &c.cached_at {
@@ -395,10 +409,7 @@ impl MemoryService {
         let mut cache_dirty = false;
 
         if want_narrative {
-            let narrative_missing = cached
-                .as_ref()
-                .and_then(|c| c.narrative.as_ref())
-                .is_none();
+            let narrative_missing = cached.as_ref().and_then(|c| c.narrative.as_ref()).is_none();
 
             if is_stale || narrative_missing {
                 let narrative = self
@@ -413,10 +424,7 @@ impl MemoryService {
         }
 
         if want_compact {
-            let summary_missing = cached
-                .as_ref()
-                .and_then(|c| c.summary.as_ref())
-                .is_none();
+            let summary_missing = cached.as_ref().and_then(|c| c.summary.as_ref()).is_none();
 
             if is_stale || summary_missing {
                 let compacted = self.profile_generator.compact_facts(&all_facts).await?;
@@ -429,8 +437,7 @@ impl MemoryService {
                     profile.dynamic_facts = Vec::new();
                 }
             } else if let Some(ref summary) = new_summary {
-                if let Ok(compacted) =
-                    serde_json::from_str::<HashMap<String, Vec<String>>>(summary)
+                if let Ok(compacted) = serde_json::from_str::<HashMap<String, Vec<String>>>(summary)
                 {
                     profile.static_facts = format_compacted_facts(&compacted);
                     profile.dynamic_facts = Vec::new();
@@ -439,12 +446,13 @@ impl MemoryService {
         }
 
         if cache_dirty {
-            self.db.upsert_cached_profile(
-                &req.container_tag,
-                new_narrative.as_deref(),
-                new_summary.as_deref(),
-            )
-            .await?;
+            self.db
+                .upsert_cached_profile(
+                    &req.container_tag,
+                    new_narrative.as_deref(),
+                    new_summary.as_deref(),
+                )
+                .await?;
         }
 
         let search_results = if let Some(ref q) = req.q {
@@ -577,7 +585,9 @@ mod tests {
         let _preference = MemoryType::Preference;
 
         use crate::intelligence::RelationshipDetector;
-        let _: fn(crate::llm::LlmProvider, crate::embeddings::EmbeddingProvider) -> RelationshipDetector =
-            RelationshipDetector::new;
+        let _: fn(
+            crate::llm::LlmProvider,
+            crate::embeddings::EmbeddingProvider,
+        ) -> RelationshipDetector = RelationshipDetector::new;
     }
 }

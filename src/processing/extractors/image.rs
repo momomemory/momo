@@ -46,6 +46,7 @@ impl ImageExtractor {
     ///
     /// # Returns
     /// ExtractedContent with extracted text and metadata
+    #[allow(dead_code)]
     pub async fn extract_raw(bytes: &[u8], ocr_provider: &OcrProvider) -> Result<ExtractedContent> {
         let text = ocr_provider.ocr(bytes).await?;
         let word_count = text.split_whitespace().count() as i32;

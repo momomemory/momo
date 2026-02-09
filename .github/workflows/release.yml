@@ -1,0 +1,274 @@
+name: Release
+
+on:
+  push:
+    tags:
+      - "v[0-9]*.[0-9]*.[0-9]*"
+      - "v[0-9]*.[0-9]*.[0-9]*-*"
+  workflow_dispatch:
+    inputs:
+      version:
+        description: "Version override (e.g. 0.2.0). Leave empty to read from Cargo.toml."
+        required: false
+        type: string
+      dry_run:
+        description: "Dry run — build everything but skip publishing."
+        required: false
+        type: boolean
+        default: false
+      prerelease:
+        description: "Mark this release as a pre-release."
+        required: false
+        type: boolean
+        default: false
+
+permissions:
+  contents: write
+  packages: write
+  attestations: write
+  id-token: write
+
+concurrency:
+  group: release-${{ github.ref }}
+  cancel-in-progress: false
+
+env:
+  CARGO_TERM_COLOR: always
+  REGISTRY: ghcr.io
+  IMAGE_NAME: ${{ github.repository }}
+
+jobs:
+  # ──────────────────────────────────────────────
+  # 1. Determine version and validate
+  # ──────────────────────────────────────────────
+  meta:
+    name: Release metadata
+    runs-on: ubuntu-latest
+    outputs:
+      version: ${{ steps.version.outputs.version }}
+      tag: ${{ steps.version.outputs.tag }}
+      prerelease: ${{ steps.version.outputs.prerelease }}
+      dry_run: ${{ steps.version.outputs.dry_run }}
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Determine version
+        id: version
+        shell: bash
+        run: |
+          # Resolve version from tag, dispatch input, or Cargo.toml
+          if [[ "${{ github.event_name }}" == "push" ]]; then
+            TAG="${GITHUB_REF#refs/tags/}"
+            VERSION="${TAG#v}"
+            DRY_RUN="false"
+          elif [[ -n "${{ inputs.version }}" ]]; then
+            VERSION="${{ inputs.version }}"
+            VERSION="${VERSION#v}"
+            TAG="v${VERSION}"
+            DRY_RUN="${{ inputs.dry_run }}"
+          else
+            VERSION=$(grep -E '^version\s*=' Cargo.toml | head -1 | grep -oP '"\K[^"]+' || true)
+            if [[ -z "$VERSION" || "$VERSION" == *"workspace"* ]]; then
+              echo "::error::Could not determine version from Cargo.toml. Provide version input."
+              exit 1
+            fi
+            TAG="v${VERSION}"
+            DRY_RUN="${{ inputs.dry_run }}"
+          fi
+
+          # Detect pre-release (contains hyphen: v1.0.0-rc.1, v1.0.0-beta)
+          if [[ "$VERSION" == *-* ]] || [[ "${{ inputs.prerelease }}" == "true" ]]; then
+            PRERELEASE="true"
+          else
+            PRERELEASE="false"
+          fi
+
+          echo "version=${VERSION}" >> "$GITHUB_OUTPUT"
+          echo "tag=${TAG}" >> "$GITHUB_OUTPUT"
+          echo "prerelease=${PRERELEASE}" >> "$GITHUB_OUTPUT"
+          echo "dry_run=${DRY_RUN}" >> "$GITHUB_OUTPUT"
+
+          echo "## Release metadata" >> "$GITHUB_STEP_SUMMARY"
+          echo "- **Version:** ${VERSION}" >> "$GITHUB_STEP_SUMMARY"
+          echo "- **Tag:** ${TAG}" >> "$GITHUB_STEP_SUMMARY"
+          echo "- **Pre-release:** ${PRERELEASE}" >> "$GITHUB_STEP_SUMMARY"
+          echo "- **Dry run:** ${DRY_RUN}" >> "$GITHUB_STEP_SUMMARY"
+
+      - name: Validate version matches Cargo.toml
+        shell: bash
+        run: |
+          CARGO_VERSION=$(grep -E '^version\s*=' Cargo.toml | head -1 | grep -oP '"\K[^"]+' || true)
+          RELEASE_VERSION="${{ steps.version.outputs.version }}"
+          if [[ -z "$CARGO_VERSION" ]]; then
+            echo "::warning::Could not extract version from Cargo.toml (workspace-inherited). Skipping validation."
+          elif [[ "$CARGO_VERSION" != "$RELEASE_VERSION" ]]; then
+            echo "::error::Version mismatch: Cargo.toml has ${CARGO_VERSION} but release is ${RELEASE_VERSION}"
+            exit 1
+          else
+            echo "Version validated: ${CARGO_VERSION}"
+          fi
+
+  # ──────────────────────────────────────────────
+  # 2. Build native binaries (matrix)
+  # ──────────────────────────────────────────────
+  build-binary:
+    name: Build ${{ matrix.target }}
+    needs: meta
+    runs-on: ${{ matrix.runner }}
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - target: x86_64-unknown-linux-gnu
+            runner: ubuntu-latest
+            archive: momo-linux-amd64.tar.gz
+          - target: x86_64-apple-darwin
+            runner: macos-13
+            archive: momo-darwin-amd64.tar.gz
+          - target: aarch64-apple-darwin
+            runner: macos-14
+            archive: momo-darwin-arm64.tar.gz
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Install system dependencies (Linux)
+        if: runner.os == 'Linux'
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y \
+            pkg-config \
+            libssl-dev \
+            tesseract-ocr \
+            tesseract-ocr-eng \
+            libleptonica-dev \
+            libtesseract-dev \
+            clang \
+            cmake
+
+      - name: Install system dependencies (macOS)
+        if: runner.os == 'macOS'
+        run: |
+          brew install tesseract leptonica pkg-config cmake
+
+      - name: Setup Rust toolchain
+        uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: ${{ matrix.target }}
+
+      - name: Cache cargo artifacts
+        uses: swatinem/rust-cache@v2
+        with:
+          key: release-${{ matrix.target }}
+
+      - name: Build release binary
+        run: |
+          cargo build --release --target ${{ matrix.target }}
+
+      - name: Package binary
+        shell: bash
+        run: |
+          BINARY="target/${{ matrix.target }}/release/momo"
+          STAGING="momo-${{ needs.meta.outputs.version }}"
+          mkdir -p "${STAGING}"
+          cp "${BINARY}" "${STAGING}/momo"
+          cp LICENSE README.md "${STAGING}/" 2>/dev/null || true
+          tar czf "${{ matrix.archive }}" -C "${STAGING}" .
+          shasum -a 256 "${{ matrix.archive }}" > "${{ matrix.archive }}.sha256"
+
+      - name: Upload binary artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: ${{ matrix.archive }}
+          path: |
+            ${{ matrix.archive }}
+            ${{ matrix.archive }}.sha256
+          retention-days: 5
+
+  # ──────────────────────────────────────────────
+  # 3. Build and push Docker image
+  # ──────────────────────────────────────────────
+  docker:
+    name: Docker image
+    needs: meta
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Log in to GHCR
+        if: needs.meta.outputs.dry_run != 'true'
+        uses: docker/login-action@v3
+        with:
+          registry: ${{ env.REGISTRY }}
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Extract Docker metadata
+        id: docker-meta
+        uses: docker/metadata-action@v5
+        with:
+          images: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}
+          tags: |
+            # On stable tag: version + latest
+            type=semver,pattern={{version}},value=${{ needs.meta.outputs.tag }}
+            type=semver,pattern={{major}}.{{minor}},value=${{ needs.meta.outputs.tag }}
+            type=raw,value=latest,enable=${{ needs.meta.outputs.prerelease != 'true' }}
+            # Always: SHA
+            type=sha,prefix=
+
+      - name: Build and push Docker image
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          file: ./Dockerfile
+          push: ${{ needs.meta.outputs.dry_run != 'true' }}
+          tags: ${{ steps.docker-meta.outputs.tags }}
+          labels: ${{ steps.docker-meta.outputs.labels }}
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+          platforms: linux/amd64
+
+  # ──────────────────────────────────────────────
+  # 4. Create GitHub Release
+  # ──────────────────────────────────────────────
+  release:
+    name: Publish GitHub Release
+    needs: [meta, build-binary, docker]
+    if: needs.meta.outputs.dry_run != 'true'
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Download all binary artifacts
+        uses: actions/download-artifact@v4
+        with:
+          path: artifacts
+          merge-multiple: true
+
+      - name: Generate combined checksums
+        working-directory: artifacts
+        run: |
+          cat *.sha256 > checksums.sha256
+          echo "## Checksums" >> "$GITHUB_STEP_SUMMARY"
+          echo '```' >> "$GITHUB_STEP_SUMMARY"
+          cat checksums.sha256 >> "$GITHUB_STEP_SUMMARY"
+          echo '```' >> "$GITHUB_STEP_SUMMARY"
+
+      - name: Create GitHub Release
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: ${{ needs.meta.outputs.tag }}
+          name: Momo ${{ needs.meta.outputs.version }}
+          prerelease: ${{ needs.meta.outputs.prerelease == 'true' }}
+          generate_release_notes: true
+          files: |
+            artifacts/momo-*.tar.gz
+            artifacts/checksums.sha256
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}

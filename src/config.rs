@@ -18,22 +18,6 @@ where
     }
 }
 
-fn parse_env_opt<T: std::str::FromStr>(var: &str) -> Option<T>
-where
-    T::Err: std::fmt::Display,
-{
-    match env::var(var) {
-        Ok(val) => match val.parse() {
-            Ok(parsed) => Some(parsed),
-            Err(e) => {
-                tracing::warn!("Invalid value '{}' for {}: {}. Ignoring.", val, var, e);
-                None
-            }
-        },
-        Err(_) => None,
-    }
-}
-
 /// Parse `RERANK_DOMAIN_MODELS` env var.
 /// Format: comma-separated `domain:model` pairs, e.g. `code:jina-reranker-v1-turbo-en,docs:bge-reranker-v2-m3`
 fn parse_domain_models() -> HashMap<String, String> {
@@ -143,6 +127,7 @@ pub struct RerankerConfig {
     pub model: String,
     pub cache_dir: String,
     pub batch_size: usize,
+    #[allow(dead_code)] // Reserved for domain-specific reranker routing
     pub domain_models: HashMap<String, String>,
 }
 

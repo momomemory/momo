@@ -345,16 +345,29 @@ mod tests {
         while let Some(row) = result_set.next().await.unwrap() {
             let name: String = row.get(0).unwrap();
             let col_type: String = row.get(1).unwrap();
-            let default: String = row.get::<Option<String>>(2).unwrap().unwrap_or_else(|| "NULL".to_string());
+            let default: String = row
+                .get::<Option<String>>(2)
+                .unwrap()
+                .unwrap_or_else(|| "NULL".to_string());
             rows.push((name, col_type, default));
         }
 
-        assert_eq!(rows.len(), 2, "Expected 2 columns (should_llm_filter, filter_prompt)");
+        assert_eq!(
+            rows.len(),
+            2,
+            "Expected 2 columns (should_llm_filter, filter_prompt)"
+        );
 
         let should_llm_filter = rows.iter().find(|(name, _, _)| name == "should_llm_filter");
-        assert!(should_llm_filter.is_some(), "should_llm_filter column should exist");
+        assert!(
+            should_llm_filter.is_some(),
+            "should_llm_filter column should exist"
+        );
         let (_, col_type, default) = should_llm_filter.unwrap();
-        assert_eq!(col_type, "INTEGER", "should_llm_filter should be INTEGER type");
+        assert_eq!(
+            col_type, "INTEGER",
+            "should_llm_filter should be INTEGER type"
+        );
         assert_eq!(default, "0", "should_llm_filter should default to 0");
 
         let filter_prompt = rows.iter().find(|(name, _, _)| name == "filter_prompt");

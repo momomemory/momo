@@ -74,8 +74,10 @@ impl DocumentRepository {
         }
 
         let sql = format!("SELECT * FROM documents WHERE id IN ({placeholders})");
-        let params: Vec<libsql::Value> =
-            ids.iter().map(|id| libsql::Value::from(id.clone())).collect();
+        let params: Vec<libsql::Value> = ids
+            .iter()
+            .map(|id| libsql::Value::from(id.clone()))
+            .collect();
 
         let mut rows = conn.query(&sql, libsql::params_from_iter(params)).await?;
         let mut results = Vec::new();
@@ -497,9 +499,15 @@ mod tests {
     async fn test_get_by_ids_returns_matching_documents() {
         let conn = setup_test_db().await;
 
-        DocumentRepository::create(&conn, &make_doc("d1", vec![])).await.unwrap();
-        DocumentRepository::create(&conn, &make_doc("d2", vec![])).await.unwrap();
-        DocumentRepository::create(&conn, &make_doc("d3", vec![])).await.unwrap();
+        DocumentRepository::create(&conn, &make_doc("d1", vec![]))
+            .await
+            .unwrap();
+        DocumentRepository::create(&conn, &make_doc("d2", vec![]))
+            .await
+            .unwrap();
+        DocumentRepository::create(&conn, &make_doc("d3", vec![]))
+            .await
+            .unwrap();
 
         let ids = vec!["d1".to_string(), "d3".to_string()];
         let results = DocumentRepository::get_by_ids(&conn, &ids).await.unwrap();
@@ -514,7 +522,9 @@ mod tests {
     async fn test_get_by_ids_empty_input() {
         let conn = setup_test_db().await;
 
-        DocumentRepository::create(&conn, &make_doc("d1", vec![])).await.unwrap();
+        DocumentRepository::create(&conn, &make_doc("d1", vec![]))
+            .await
+            .unwrap();
 
         let results = DocumentRepository::get_by_ids(&conn, &[]).await.unwrap();
         assert!(results.is_empty());
@@ -524,7 +534,9 @@ mod tests {
     async fn test_get_by_ids_nonexistent_ids() {
         let conn = setup_test_db().await;
 
-        DocumentRepository::create(&conn, &make_doc("d1", vec![])).await.unwrap();
+        DocumentRepository::create(&conn, &make_doc("d1", vec![]))
+            .await
+            .unwrap();
 
         let ids = vec!["no_such_id".to_string(), "also_missing".to_string()];
         let results = DocumentRepository::get_by_ids(&conn, &ids).await.unwrap();
@@ -535,8 +547,12 @@ mod tests {
     async fn test_get_by_ids_partial_match() {
         let conn = setup_test_db().await;
 
-        DocumentRepository::create(&conn, &make_doc("d1", vec![])).await.unwrap();
-        DocumentRepository::create(&conn, &make_doc("d2", vec![])).await.unwrap();
+        DocumentRepository::create(&conn, &make_doc("d1", vec![]))
+            .await
+            .unwrap();
+        DocumentRepository::create(&conn, &make_doc("d2", vec![]))
+            .await
+            .unwrap();
 
         let ids = vec!["d1".to_string(), "missing".to_string()];
         let results = DocumentRepository::get_by_ids(&conn, &ids).await.unwrap();

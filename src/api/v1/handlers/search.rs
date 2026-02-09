@@ -278,10 +278,7 @@ mod tests {
         let req: SearchRequest = serde_json::from_str(json).expect("deserialize");
         assert_eq!(req.q, "test query");
         assert_eq!(req.scope, SearchScope::Hybrid);
-        assert_eq!(
-            req.container_tags.as_ref().map(|t| t.len()),
-            Some(2)
-        );
+        assert_eq!(req.container_tags.as_ref().map(|t| t.len()), Some(2));
         assert_eq!(req.threshold, Some(0.7));
         assert_eq!(req.limit, Some(25));
         assert!(req.include.documents);

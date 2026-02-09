@@ -1,15 +1,14 @@
 use std::sync::Arc;
 
 use chrono::Utc;
-use libsql::Builder;
 use serde_json::json;
 use tempfile::TempDir;
 use wiremock::matchers::{method, path};
 use wiremock::{Mock, MockServer, ResponseTemplate};
 
 use momo::config::{DatabaseConfig, EmbeddingsConfig, InferenceConfig, LlmConfig};
-use momo::db::{Database, LibSqlBackend};
 use momo::db::repository::MemoryRepository;
+use momo::db::{Database, LibSqlBackend};
 use momo::embeddings::EmbeddingProvider;
 use momo::intelligence::InferenceEngine;
 use momo::llm::LlmProvider;
@@ -54,41 +53,6 @@ fn test_config() -> InferenceConfig {
 async fn test_database() -> (Database, TempDir) {
     let temp_dir = tempfile::tempdir().expect("failed to create temp dir");
     let db_path = temp_dir.path().join("inference_integ_test.db");
-    let raw_db = Builder::new_local(db_path.display().to_string())
-        .build()
-        .await
-        .expect("failed to create raw database");
-    let conn = raw_db.connect().expect("connect should work");
-    conn.execute(
-        r#"
-        CREATE TABLE memories (
-            id TEXT PRIMARY KEY,
-            memory TEXT NOT NULL,
-            space_id TEXT NOT NULL,
-            container_tag TEXT,
-            version INTEGER NOT NULL DEFAULT 1,
-            is_latest INTEGER NOT NULL DEFAULT 1,
-            parent_memory_id TEXT,
-            root_memory_id TEXT,
-            memory_relations TEXT NOT NULL DEFAULT '{}',
-            source_count INTEGER NOT NULL DEFAULT 0,
-            is_inference INTEGER NOT NULL DEFAULT 0,
-            is_forgotten INTEGER NOT NULL DEFAULT 0,
-            is_static INTEGER NOT NULL DEFAULT 0,
-            forget_after TEXT,
-            forget_reason TEXT,
-            memory_type TEXT NOT NULL DEFAULT 'fact',
-            last_accessed TEXT,
-            metadata TEXT NOT NULL DEFAULT '{}',
-            created_at TEXT NOT NULL,
-            updated_at TEXT NOT NULL,
-            embedding F32_BLOB(384)
-        )
-        "#,
-        (),
-    )
-    .await
-    .expect("memories table should be created");
 
     let config = DatabaseConfig {
         url: format!("file:{}", db_path.display()),
@@ -103,21 +67,14 @@ async fn test_database() -> (Database, TempDir) {
     (db, temp_dir)
 }
 
-async fn test_embeddings_provider(mock_server: &MockServer) -> EmbeddingProvider {
+async fn test_embeddings_provider() -> EmbeddingProvider {
     let config = EmbeddingsConfig {
-        model: "openai/text-embedding-3-small".to_string(),
+        model: "BAAI/bge-small-en-v1.5".to_string(),
         dimensions: 384,
         batch_size: 8,
-        api_key: Some("test-key".to_string()),
-        base_url: Some(mock_server.uri()),
-        rate_limit: None,
-        timeout_secs: 5,
-        max_retries: 0,
     };
 
-    EmbeddingProvider::new_async(&config)
-        .await
-        .expect("failed to create test embeddings provider")
+    EmbeddingProvider::new(&config).expect("failed to create test embeddings provider")
 }
 
 fn test_llm_provider(base_url: String) -> LlmProvider {
@@ -132,7 +89,6 @@ fn test_llm_provider(base_url: String) -> LlmProvider {
         query_rewrite_timeout_secs: 2,
         enable_auto_relations: false,
         enable_contradiction_detection: false,
-        enable_llm_filter: false,
         filter_prompt: None,
     };
 
@@ -203,19 +159,19 @@ async fn mount_embeddings_mock(mock_server: &MockServer) {
         .await;
 }
 
-/// Seed the database with Fact memories and their embeddings
 async fn seed_fact_memories(
     db: &Database,
+    embeddings: &EmbeddingProvider,
     count: usize,
     container_tag: Option<&str>,
 ) -> Vec<String> {
     let conn = db.connect().expect("connect should work");
-    let embedding = vec![0.1_f32; 384];
     let mut ids = Vec::new();
 
     for i in 1..=count {
         let id = format!("fact_{i}");
         let content = format!("Important fact number {i} about the user");
+        let embedding = embeddings.embed_passage(&content).await.unwrap();
         let mem = test_memory(&id, &content, container_tag);
         MemoryRepository::create(&conn, &mem).await.unwrap();
         MemoryRepository::update_embedding(&conn, &id, &embedding)
@@ -236,7 +192,7 @@ async fn get_inference_memories(db: &Database) -> Vec<Memory> {
             SELECT id, memory, space_id, container_tag, version, is_latest,
                    parent_memory_id, root_memory_id, memory_relations, source_count,
                    is_inference, is_forgotten, is_static, forget_after, forget_reason,
-                   memory_type, last_accessed, metadata, created_at, updated_at
+                   memory_type, last_accessed, confidence, metadata, created_at, updated_at
             FROM memories
             WHERE is_inference = 1
             "#,
@@ -272,14 +228,19 @@ async fn inference_e2e_generates_memories() {
         .await;
 
     let (db, _temp_dir) = test_database().await;
-    let embeddings = test_embeddings_provider(&mock_server).await;
+    let embeddings = test_embeddings_provider().await;
     let llm = test_llm_provider(mock_server.uri());
 
-    // Seed 3 fact memories
-    let seed_ids = seed_fact_memories(&db, 3, Some("user_1")).await;
+    // Seed 3 fact memories with real embeddings
+    let seed_ids = seed_fact_memories(&db, &embeddings, 3, Some("user_1")).await;
     assert_eq!(seed_ids.len(), 3);
 
-    let engine = InferenceEngine::new(Arc::new(LibSqlBackend::new(db.clone())), llm, embeddings, test_config());
+    let engine = InferenceEngine::new(
+        Arc::new(LibSqlBackend::new(db.clone())),
+        llm,
+        embeddings,
+        test_config(),
+    );
     let stats = engine.run_once().await.expect("run_once should succeed");
 
     // Should have processed seeds and created inferences
@@ -334,13 +295,17 @@ async fn inference_deduplication_across_runs() {
         .await;
 
     let (db, _temp_dir) = test_database().await;
-    let embeddings = test_embeddings_provider(&mock_server).await;
+    let embeddings = test_embeddings_provider().await;
     let llm = test_llm_provider(mock_server.uri());
 
-    // Seed memories
-    seed_fact_memories(&db, 3, Some("user_1")).await;
+    seed_fact_memories(&db, &embeddings, 3, Some("user_1")).await;
 
-    let engine = InferenceEngine::new(Arc::new(LibSqlBackend::new(db.clone())), llm, embeddings, test_config());
+    let engine = InferenceEngine::new(
+        Arc::new(LibSqlBackend::new(db.clone())),
+        llm,
+        embeddings,
+        test_config(),
+    );
 
     // First run — should create inferences
     let stats1 = engine.run_once().await.expect("first run should succeed");
@@ -388,11 +353,16 @@ async fn inference_handles_empty_database() {
         .await;
 
     let (db, _temp_dir) = test_database().await;
-    let embeddings = test_embeddings_provider(&mock_server).await;
+    let embeddings = test_embeddings_provider().await;
     let llm = test_llm_provider(mock_server.uri());
 
     // Don't seed any memories — DB is empty
-    let engine = InferenceEngine::new(Arc::new(LibSqlBackend::new(db.clone())), llm, embeddings, test_config());
+    let engine = InferenceEngine::new(
+        Arc::new(LibSqlBackend::new(db.clone())),
+        llm,
+        embeddings,
+        test_config(),
+    );
     let stats = engine
         .run_once()
         .await
@@ -417,15 +387,19 @@ async fn inference_degrades_when_llm_unavailable() {
     mount_embeddings_mock(&mock_server).await;
 
     let (db, _temp_dir) = test_database().await;
-    let embeddings = test_embeddings_provider(&mock_server).await;
+    let embeddings = test_embeddings_provider().await;
 
     // Use an unavailable LLM provider (no mock needed)
     let llm = LlmProvider::unavailable("test: LLM not configured");
 
-    // Seed some memories (they exist but LLM can't process them)
-    seed_fact_memories(&db, 3, Some("user_1")).await;
+    seed_fact_memories(&db, &embeddings, 3, Some("user_1")).await;
 
-    let engine = InferenceEngine::new(Arc::new(LibSqlBackend::new(db.clone())), llm, embeddings, test_config());
+    let engine = InferenceEngine::new(
+        Arc::new(LibSqlBackend::new(db.clone())),
+        llm,
+        embeddings,
+        test_config(),
+    );
     let stats = engine
         .run_once()
         .await
@@ -464,13 +438,17 @@ async fn inference_filters_by_confidence() {
         .await;
 
     let (db, _temp_dir) = test_database().await;
-    let embeddings = test_embeddings_provider(&mock_server).await;
+    let embeddings = test_embeddings_provider().await;
     let llm = test_llm_provider(mock_server.uri());
 
-    seed_fact_memories(&db, 3, Some("user_1")).await;
-
+    seed_fact_memories(&db, &embeddings, 3, Some("user_1")).await;
     let config = test_config(); // confidence_threshold = 0.7
-    let engine = InferenceEngine::new(Arc::new(LibSqlBackend::new(db.clone())), llm, embeddings, config);
+    let engine = InferenceEngine::new(
+        Arc::new(LibSqlBackend::new(db.clone())),
+        llm,
+        embeddings,
+        config,
+    );
     let stats = engine.run_once().await.expect("run_once should succeed");
 
     // Low confidence (0.5) should be skipped
@@ -502,13 +480,18 @@ async fn inference_filters_by_confidence() {
         .await;
 
     let (db2, _temp_dir2) = test_database().await;
-    let embeddings2 = test_embeddings_provider(&mock_server2).await;
+    let embeddings2 = test_embeddings_provider().await;
     let llm2 = test_llm_provider(mock_server2.uri());
 
-    seed_fact_memories(&db2, 3, Some("user_1")).await;
+    seed_fact_memories(&db2, &embeddings2, 3, Some("user_1")).await;
 
     let config2 = test_config(); // confidence_threshold = 0.7
-    let engine2 = InferenceEngine::new(Arc::new(LibSqlBackend::new(db2.clone())), llm2, embeddings2, config2);
+    let engine2 = InferenceEngine::new(
+        Arc::new(LibSqlBackend::new(db2.clone())),
+        llm2,
+        embeddings2,
+        config2,
+    );
     let stats2 = engine2.run_once().await.expect("run_once should succeed");
 
     // High confidence (0.9) should be created
@@ -546,19 +529,21 @@ async fn inference_excludes_episodes_from_sources() {
 
     let (db, _temp_dir) = test_database().await;
     let conn = db.connect().expect("connect should work");
-    let embedding = vec![0.1_f32; 384];
+
+    let embeddings = test_embeddings_provider().await;
 
     // Create ONLY episode memories (no facts)
     for i in 1..=3 {
         let id = format!("ep_{i}");
-        let mem = test_episode_memory(&id, &format!("User had conversation {i} about coding"));
+        let content = format!("User had conversation {i} about coding");
+        let embedding = embeddings.embed_passage(&content).await.unwrap();
+        let mem = test_episode_memory(&id, &content);
         MemoryRepository::create(&conn, &mem).await.unwrap();
         MemoryRepository::update_embedding(&conn, &id, &embedding)
             .await
             .unwrap();
     }
 
-    let embeddings = test_embeddings_provider(&mock_server).await;
     let llm = test_llm_provider(mock_server.uri());
 
     // Config with exclude_episodes = true (default)
@@ -568,7 +553,12 @@ async fn inference_excludes_episodes_from_sources() {
         "Precondition: exclude_episodes should be true"
     );
 
-    let engine = InferenceEngine::new(Arc::new(LibSqlBackend::new(db.clone())), llm, embeddings, config);
+    let engine = InferenceEngine::new(
+        Arc::new(LibSqlBackend::new(db.clone())),
+        llm,
+        embeddings,
+        config,
+    );
     let stats = engine.run_once().await.expect("run_once should succeed");
 
     // Episodes should be excluded from seed selection
@@ -589,16 +579,6 @@ async fn inference_excludes_episodes_from_sources() {
     );
 
     // Now add a single fact memory alongside episodes — only the fact should be used
-    let fact = test_memory(
-        "fact_solo",
-        "User prefers Rust for systems programming",
-        Some("user_1"),
-    );
-    MemoryRepository::create(&conn, &fact).await.unwrap();
-    MemoryRepository::update_embedding(&conn, "fact_solo", &embedding)
-        .await
-        .unwrap();
-
     // Create a new engine instance (same DB with the added fact)
     let mock_server2 = MockServer::start().await;
     mount_embeddings_mock(&mock_server2).await;
@@ -611,11 +591,25 @@ async fn inference_excludes_episodes_from_sources() {
         .mount(&mock_server2)
         .await;
 
-    let embeddings2 = test_embeddings_provider(&mock_server2).await;
+    let embeddings2 = test_embeddings_provider().await;
+
+    let fact_content = "User prefers Rust for systems programming";
+    let fact = test_memory("fact_solo", fact_content, Some("user_1"));
+    let fact_embedding = embeddings2.embed_passage(fact_content).await.unwrap();
+    MemoryRepository::create(&conn, &fact).await.unwrap();
+    MemoryRepository::update_embedding(&conn, "fact_solo", &fact_embedding)
+        .await
+        .unwrap();
+
     let llm2 = test_llm_provider(mock_server2.uri());
     let config2 = test_config();
 
-    let engine2 = InferenceEngine::new(Arc::new(LibSqlBackend::new(db.clone())), llm2, embeddings2, config2);
+    let engine2 = InferenceEngine::new(
+        Arc::new(LibSqlBackend::new(db.clone())),
+        llm2,
+        embeddings2,
+        config2,
+    );
     let stats2 = engine2
         .run_once()
         .await

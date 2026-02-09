@@ -87,10 +87,10 @@ mod tests {
         Config, DatabaseConfig, EmbeddingsConfig, InferenceConfig, MemoryConfig, OcrConfig,
         ProcessingConfig, ServerConfig, TranscriptionConfig,
     };
+    use axum::body::Body;
+    use axum::http::Request;
     use axum::http::StatusCode;
     use axum::{middleware, routing::get, Router};
-    use axum::http::Request;
-    use axum::body::Body;
     use tower::ServiceExt;
 
     fn make_config(api_keys: Vec<String>) -> Config {
@@ -109,16 +109,10 @@ mod tests {
                 model: "BAAI/bge-small-en-v1.5".to_string(),
                 dimensions: 384,
                 batch_size: 256,
-                api_key: None,
-                base_url: None,
-                rate_limit: None,
-                timeout_secs: 30,
-                max_retries: 3,
             },
             processing: ProcessingConfig {
                 chunk_size: 512,
                 chunk_overlap: 50,
-                max_content_length: 10_000_000,
             },
             memory: MemoryConfig {
                 episode_decay_days: 30.0,
@@ -155,14 +149,11 @@ mod tests {
     async fn build_test_app(api_keys: Vec<String>) -> Router {
         let config = make_config(api_keys);
 
-        let raw_db =
-            crate::db::Database::new(&config.database).await.unwrap();
+        let raw_db = crate::db::Database::new(&config.database).await.unwrap();
         let db_backend = crate::db::LibSqlBackend::new(raw_db);
-        let db: std::sync::Arc<dyn crate::db::DatabaseBackend> =
-            std::sync::Arc::new(db_backend);
+        let db: std::sync::Arc<dyn crate::db::DatabaseBackend> = std::sync::Arc::new(db_backend);
 
-        let embeddings =
-            crate::embeddings::EmbeddingProvider::new(&config.embeddings).unwrap();
+        let embeddings = crate::embeddings::EmbeddingProvider::new(&config.embeddings).unwrap();
         let ocr = crate::ocr::OcrProvider::new(&config.ocr).unwrap();
         let transcription =
             crate::transcription::TranscriptionProvider::new(&config.transcription).unwrap();
@@ -220,7 +211,10 @@ mod tests {
         let (status, json) = parse_error_body(response).await;
         assert_eq!(status, StatusCode::UNAUTHORIZED);
         assert_eq!(json["error"]["code"], "unauthorized");
-        assert!(json["error"]["message"].as_str().unwrap().contains("API keys not configured"));
+        assert!(json["error"]["message"]
+            .as_str()
+            .unwrap()
+            .contains("API keys not configured"));
         assert!(json.get("data").is_none());
     }
 

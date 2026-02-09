@@ -165,7 +165,6 @@ fn count_words(text: &str) -> i32 {
 
 #[cfg(test)]
 mod tests {
-    
 
     #[test]
     fn test_strip_bom() {

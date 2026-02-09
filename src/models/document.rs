@@ -28,6 +28,7 @@ pub struct Document {
 }
 
 impl Document {
+    #[allow(dead_code)] // Public API constructor
     pub fn new(id: String) -> Self {
         let now = Utc::now();
         Self {
@@ -228,9 +229,7 @@ mod tests {
     #[test]
     fn test_create_document_request_filter_prompt_max_length() {
         let long_prompt = "a".repeat(1000);
-        let json = format!(
-            r#"{{"content": "test", "filter_prompt": "{long_prompt}"}}"#
-        );
+        let json = format!(r#"{{"content": "test", "filter_prompt": "{long_prompt}"}}"#);
         let request: CreateDocumentRequest = serde_json::from_str(&json).unwrap();
         assert_eq!(request.filter_prompt, Some(long_prompt));
     }
@@ -246,9 +245,7 @@ mod tests {
     #[test]
     fn test_create_document_request_filter_prompt_exceeds_max_length() {
         let long_prompt = "a".repeat(1001);
-        let json = format!(
-            r#"{{"content": "test", "filter_prompt": "{long_prompt}"}}"#
-        );
+        let json = format!(r#"{{"content": "test", "filter_prompt": "{long_prompt}"}}"#);
         let request: CreateDocumentRequest = serde_json::from_str(&json).unwrap();
 
         use validator::Validate;

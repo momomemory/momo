@@ -38,11 +38,9 @@ impl ContentChunker for WebpageChunker {
     }
 }
 
-
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::models::DocumentType;
 
     #[test]
     fn test_webpage_chunker_basic() {
@@ -89,7 +87,6 @@ mod tests {
         let chunker = WebpageChunker::default();
         let context = ChunkContext {
             source_path: Some("https://example.com/page.html".to_string()),
-            doc_type: Some(DocumentType::Webpage),
         };
         let html = "<h1>Title</h1><p>Content.</p>";
         let chunks = chunker.chunk(html, Some(&context));
@@ -101,7 +98,6 @@ mod tests {
         let config = ProcessingConfig {
             chunk_size: 256,
             chunk_overlap: 25,
-            max_content_length: 10_000_000,
         };
         let chunker = WebpageChunker::new(&config);
 

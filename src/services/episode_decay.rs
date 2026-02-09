@@ -65,19 +65,32 @@ impl EpisodeDecayManager {
             m.memory_type = crate::models::MemoryType::Episode;
 
             let relevance = m.calculate_episode_relevance(self.decay_days, self.decay_factor);
-            debug!(id = candidate.id.as_str(), relevance, "Episode relevance calculated");
+            debug!(
+                id = candidate.id.as_str(),
+                relevance, "Episode relevance calculated"
+            );
 
             if relevance < self.threshold {
                 let forget_after = Utc::now() + Duration::days(self.grace_days as i64);
-                match self.db.set_memory_forget_after(&candidate.id, forget_after).await {
+                match self
+                    .db
+                    .set_memory_forget_after(&candidate.id, forget_after)
+                    .await
+                {
                     Ok(affected) => {
                         if affected > 0 {
                             scheduled += 1;
-                            info!(id = candidate.id.as_str(), "Scheduled episode for forgetting");
+                            info!(
+                                id = candidate.id.as_str(),
+                                "Scheduled episode for forgetting"
+                            );
                         }
                     }
                     Err(e) => {
-                        error!(id = candidate.id.as_str(), "Failed to schedule forget_after: {}", e);
+                        error!(
+                            id = candidate.id.as_str(),
+                            "Failed to schedule forget_after: {}", e
+                        );
                     }
                 }
             }
@@ -140,7 +153,9 @@ mod tests {
         .await
         .unwrap();
 
-        let db = Database { db: Arc::new(inner_db) };
+        let db = Database {
+            db: Arc::new(inner_db),
+        };
         let backend: Arc<dyn DatabaseBackend> = Arc::new(LibSqlBackend::new(db));
         (conn, backend, temp_file)
     }

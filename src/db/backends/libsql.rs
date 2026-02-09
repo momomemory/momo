@@ -1,22 +1,22 @@
-use std::collections::HashMap;
-use async_trait::async_trait;
-use chrono::{DateTime, Utc};
-use crate::error::Result;
 use crate::db::connection::Database;
 use crate::db::repository::{
     ChunkRepository, DocumentRepository, MemoryRepository, MemorySourcesRepository,
 };
-use crate::db::MetadataRepository;
-use libsql::params;
 use crate::db::traits::{
     ChunkStore, DatabaseBackend, DocumentStore, EpisodeDecayCandidate, MemorySourceStore,
     MemoryStore, MetadataStore,
 };
+use crate::db::MetadataRepository;
+use crate::error::Result;
 use crate::models::{
-    CachedProfile, Chunk, ChunkWithDocument, ContainerFilter, Document, DocumentSummary,
-    GraphData, GraphEdgeType, ListDocumentsRequest, Memory, MemoryRelationType, MemorySearchHit,
-    MemorySource, Pagination, ProcessingDocument, ProcessingStatus, UserProfile,
+    CachedProfile, Chunk, ChunkWithDocument, ContainerFilter, Document, DocumentSummary, GraphData,
+    GraphEdgeType, ListDocumentsRequest, Memory, MemoryRelationType, MemorySearchHit, MemorySource,
+    Pagination, ProcessingDocument, ProcessingStatus, UserProfile,
 };
+use async_trait::async_trait;
+use chrono::{DateTime, Utc};
+use libsql::params;
+use std::collections::HashMap;
 
 pub struct LibSqlBackend {
     db: Database,
@@ -58,7 +58,10 @@ impl DocumentStore for LibSqlBackend {
         let conn = self.db.connect()?;
         DocumentRepository::delete_by_custom_id(&conn, custom_id).await
     }
-    async fn list_documents(&self, req: &ListDocumentsRequest) -> Result<(Vec<DocumentSummary>, Pagination)> {
+    async fn list_documents(
+        &self,
+        req: &ListDocumentsRequest,
+    ) -> Result<(Vec<DocumentSummary>, Pagination)> {
         let conn = self.db.connect()?;
         DocumentRepository::list(&conn, req).await
     }
@@ -66,7 +69,12 @@ impl DocumentStore for LibSqlBackend {
         let conn = self.db.connect()?;
         DocumentRepository::get_processing(&conn).await
     }
-    async fn update_document_status(&self, id: &str, status: ProcessingStatus, error: Option<&str>) -> Result<()> {
+    async fn update_document_status(
+        &self,
+        id: &str,
+        status: ProcessingStatus,
+        error: Option<&str>,
+    ) -> Result<()> {
         let conn = self.db.connect()?;
         DocumentRepository::update_status(&conn, id, status, error).await
     }
@@ -96,7 +104,13 @@ impl ChunkStore for LibSqlBackend {
         let conn = self.db.connect()?;
         ChunkRepository::delete_by_document_id(&conn, document_id).await
     }
-    async fn search_similar_chunks(&self, embedding: &[f32], limit: u32, threshold: f32, container_tags: Option<&[String]>) -> Result<Vec<ChunkWithDocument>> {
+    async fn search_similar_chunks(
+        &self,
+        embedding: &[f32],
+        limit: u32,
+        threshold: f32,
+        container_tags: Option<&[String]>,
+    ) -> Result<Vec<ChunkWithDocument>> {
         let conn = self.db.connect()?;
         ChunkRepository::search_similar(&conn, embedding, limit, threshold, container_tags).await
     }
@@ -121,7 +135,11 @@ impl MemoryStore for LibSqlBackend {
         let conn = self.db.connect()?;
         MemoryRepository::get_by_ids(&conn, ids).await
     }
-    async fn get_memory_by_content(&self, content: &str, container_tag: &str) -> Result<Option<Memory>> {
+    async fn get_memory_by_content(
+        &self,
+        content: &str,
+        container_tag: &str,
+    ) -> Result<Option<Memory>> {
         let conn = self.db.connect()?;
         MemoryRepository::get_by_content(&conn, content, container_tag).await
     }
@@ -141,17 +159,39 @@ impl MemoryStore for LibSqlBackend {
         let conn = self.db.connect()?;
         MemoryRepository::update_source_count(&conn, id, new_count).await
     }
-    async fn update_memory_version_chain(&self, id: &str, parent_memory_id: &str, root_memory_id: &str, version: i32) -> Result<()> {
+    async fn update_memory_version_chain(
+        &self,
+        id: &str,
+        parent_memory_id: &str,
+        root_memory_id: &str,
+        version: i32,
+    ) -> Result<()> {
         let conn = self.db.connect()?;
-        MemoryRepository::update_version_chain(&conn, id, parent_memory_id, root_memory_id, version).await
+        MemoryRepository::update_version_chain(&conn, id, parent_memory_id, root_memory_id, version)
+            .await
     }
     async fn update_memory_embedding(&self, memory_id: &str, embedding: &[f32]) -> Result<()> {
         let conn = self.db.connect()?;
         MemoryRepository::update_embedding(&conn, memory_id, embedding).await
     }
-    async fn search_similar_memories(&self, embedding: &[f32], limit: u32, threshold: f32, container_tag: Option<&str>, include_forgotten: bool) -> Result<Vec<MemorySearchHit>> {
+    async fn search_similar_memories(
+        &self,
+        embedding: &[f32],
+        limit: u32,
+        threshold: f32,
+        container_tag: Option<&str>,
+        include_forgotten: bool,
+    ) -> Result<Vec<MemorySearchHit>> {
         let conn = self.db.connect()?;
-        MemoryRepository::search_similar(&conn, embedding, limit, threshold, container_tag, include_forgotten).await
+        MemoryRepository::search_similar(
+            &conn,
+            embedding,
+            limit,
+            threshold,
+            container_tag,
+            include_forgotten,
+        )
+        .await
     }
     async fn get_memory_children(&self, parent_id: &str) -> Result<Vec<Memory>> {
         let conn = self.db.connect()?;
@@ -173,19 +213,39 @@ impl MemoryStore for LibSqlBackend {
         let conn = self.db.connect()?;
         MemoryRepository::check_inference_exists(&conn, source_ids).await
     }
-    async fn get_user_profile(&self, container_tag: &str, include_dynamic: bool, limit: u32) -> Result<UserProfile> {
+    async fn get_user_profile(
+        &self,
+        container_tag: &str,
+        include_dynamic: bool,
+        limit: u32,
+    ) -> Result<UserProfile> {
         let conn = self.db.connect()?;
         MemoryRepository::get_user_profile(&conn, container_tag, include_dynamic, limit).await
     }
-    async fn update_memory_relations(&self, id: &str, new_relations: HashMap<String, MemoryRelationType>) -> Result<()> {
+    async fn update_memory_relations(
+        &self,
+        id: &str,
+        new_relations: HashMap<String, MemoryRelationType>,
+    ) -> Result<()> {
         let conn = self.db.connect()?;
         MemoryRepository::update_relations(&conn, id, new_relations).await
     }
-    async fn add_memory_relation(&self, id: &str, related_id: &str, relation_type: MemoryRelationType) -> Result<()> {
+    async fn add_memory_relation(
+        &self,
+        id: &str,
+        related_id: &str,
+        relation_type: MemoryRelationType,
+    ) -> Result<()> {
         let conn = self.db.connect()?;
         MemoryRepository::add_relation(&conn, id, related_id, relation_type).await
     }
-    async fn get_graph_neighborhood(&self, id: &str, depth: u32, max_nodes: u32, relation_types: Option<&[GraphEdgeType]>) -> Result<GraphData> {
+    async fn get_graph_neighborhood(
+        &self,
+        id: &str,
+        depth: u32,
+        max_nodes: u32,
+        relation_types: Option<&[GraphEdgeType]>,
+    ) -> Result<GraphData> {
         let conn = self.db.connect()?;
         MemoryRepository::get_graph_neighborhood(&conn, id, depth, max_nodes, relation_types).await
     }
@@ -260,7 +320,10 @@ impl MemoryStore for LibSqlBackend {
         Ok(results)
     }
 
-    async fn get_max_memory_updated_at(&self, container_tag: &str) -> Result<Option<DateTime<Utc>>> {
+    async fn get_max_memory_updated_at(
+        &self,
+        container_tag: &str,
+    ) -> Result<Option<DateTime<Utc>>> {
         let conn = self.db.connect()?;
         let row = conn
             .query(
@@ -285,7 +348,12 @@ impl MemoryStore for LibSqlBackend {
 
 #[async_trait]
 impl MemorySourceStore for LibSqlBackend {
-    async fn create_memory_source(&self, memory_id: &str, document_id: &str, chunk_id: Option<&str>) -> Result<MemorySource> {
+    async fn create_memory_source(
+        &self,
+        memory_id: &str,
+        document_id: &str,
+        chunk_id: Option<&str>,
+    ) -> Result<MemorySource> {
         let conn = self.db.connect()?;
         MemorySourcesRepository::create(&conn, memory_id, document_id, chunk_id).await
     }
@@ -347,28 +415,35 @@ mod tests {
 
     async fn setup_test_db() -> LibSqlBackend {
         use std::time::{SystemTime, UNIX_EPOCH};
-        
+
         let timestamp = SystemTime::now()
             .duration_since(UNIX_EPOCH)
             .unwrap()
             .as_nanos();
         let thread_id = std::thread::current().id();
-        
+
         let config = DatabaseConfig {
-            url: format!("file:/tmp/momo_test_db_{thread_id:?}_{timestamp}?mode=memory&cache=shared"),
+            url: format!(
+                "file:/tmp/momo_test_db_{thread_id:?}_{timestamp}?mode=memory&cache=shared"
+            ),
             auth_token: None,
             local_path: None,
         };
-        let db = Database::new(&config).await.expect("Failed to create database");
-        
+        let db = Database::new(&config)
+            .await
+            .expect("Failed to create database");
+
         LibSqlBackend::new(db)
     }
 
     #[tokio::test]
     async fn test_get_container_filter_non_existent() {
         let backend = setup_test_db().await;
-        
-        let result = backend.get_container_filter("non_existent_tag").await.unwrap();
+
+        let result = backend
+            .get_container_filter("non_existent_tag")
+            .await
+            .unwrap();
         assert!(result.is_none());
     }
 
@@ -394,8 +469,14 @@ mod tests {
         }
 
         // Queue all done documents for reprocessing
-        let affected = backend.queue_all_documents_for_reprocessing().await.unwrap();
-        assert_eq!(affected, 2, "Should have updated exactly 2 'done' documents");
+        let affected = backend
+            .queue_all_documents_for_reprocessing()
+            .await
+            .unwrap();
+        assert_eq!(
+            affected, 2,
+            "Should have updated exactly 2 'done' documents"
+        );
 
         // Verify the done documents are now queued
         for id in &["doc_done_1", "doc_done_2"] {
@@ -415,14 +496,23 @@ mod tests {
             .unwrap();
         let row = rows.next().await.unwrap().unwrap();
         let status: String = row.get(0).unwrap();
-        assert_eq!(status, "queued", "Already-queued document should remain 'queued'");
+        assert_eq!(
+            status, "queued",
+            "Already-queued document should remain 'queued'"
+        );
 
         let mut rows = conn
-            .query("SELECT status FROM documents WHERE id = 'doc_extracting'", ())
+            .query(
+                "SELECT status FROM documents WHERE id = 'doc_extracting'",
+                (),
+            )
             .await
             .unwrap();
         let row = rows.next().await.unwrap().unwrap();
         let status: String = row.get(0).unwrap();
-        assert_eq!(status, "extracting", "Extracting document should remain 'extracting'");
+        assert_eq!(
+            status, "extracting",
+            "Extracting document should remain 'extracting'"
+        );
     }
 }

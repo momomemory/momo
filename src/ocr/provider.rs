@@ -8,7 +8,7 @@ use tracing::{info, warn};
 use crate::config::OcrConfig;
 use crate::error::{MomoError, Result};
 
-use super::api::{MistralOcrClient, DeepSeekOcrClient, OpenAiVisionClient};
+use super::api::{DeepSeekOcrClient, MistralOcrClient, OpenAiVisionClient};
 
 #[derive(Clone)]
 enum OcrApiClient {
@@ -28,15 +28,9 @@ impl OcrApiClient {
 }
 
 enum OcrBackend {
-    Local {
-        tesseract: Arc<Mutex<LepTess>>,
-    },
-    Api {
-        client: OcrApiClient,
-    },
-    Unavailable {
-        reason: String,
-    },
+    Local { tesseract: Arc<Mutex<LepTess>> },
+    Api { client: OcrApiClient },
+    Unavailable { reason: String },
 }
 
 pub struct OcrProvider {
@@ -57,7 +51,9 @@ impl OcrProvider {
             "mistral" => match MistralOcrClient::new(config) {
                 Ok(client) => {
                     info!("Mistral OCR API backend initialized");
-                    OcrBackend::Api { client: OcrApiClient::Mistral(client) }
+                    OcrBackend::Api {
+                        client: OcrApiClient::Mistral(client),
+                    }
                 }
                 Err(e) => {
                     let reason = format!("Mistral OCR backend unavailable: {e}");
@@ -68,7 +64,9 @@ impl OcrProvider {
             "deepseek" => match DeepSeekOcrClient::new(config) {
                 Ok(client) => {
                     info!("DeepSeek OCR API backend initialized");
-                    OcrBackend::Api { client: OcrApiClient::DeepSeek(client) }
+                    OcrBackend::Api {
+                        client: OcrApiClient::DeepSeek(client),
+                    }
                 }
                 Err(e) => {
                     let reason = format!("DeepSeek OCR backend unavailable: {e}");
@@ -79,7 +77,9 @@ impl OcrProvider {
             "openai" => match OpenAiVisionClient::new(config) {
                 Ok(client) => {
                     info!("OpenAI Vision OCR API backend initialized");
-                    OcrBackend::Api { client: OcrApiClient::OpenAi(client) }
+                    OcrBackend::Api {
+                        client: OcrApiClient::OpenAi(client),
+                    }
                 }
                 Err(e) => {
                     let reason = format!("OpenAI Vision OCR backend unavailable: {e}");

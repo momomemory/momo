@@ -52,11 +52,7 @@ pub async fn ingest_conversation(
     {
         match state
             .extractor
-            .check_contradictions(
-                extraction_result.memories,
-                &req.container_tag,
-                &*state.db,
-            )
+            .check_contradictions(extraction_result.memories, &req.container_tag, &*state.db)
             .await
         {
             Ok(m) => m,
@@ -82,10 +78,7 @@ pub async fn ingest_conversation(
         let memory_type = if let Some(req_type) = request_memory_type {
             req_type
         } else {
-            memory
-                .memory_type
-                .parse()
-                .unwrap_or(MemoryType::Fact)
+            memory.memory_type.parse().unwrap_or(MemoryType::Fact)
         };
 
         match state

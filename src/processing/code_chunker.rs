@@ -176,8 +176,7 @@ impl ContentChunker for CodeChunker {
 
         chunks
             .iter()
-            .enumerate()
-            .map(|(i, chunk_text)| {
+            .map(|chunk_text| {
                 let enriched_content = self.add_context_prefix(chunk_text, text, &context);
                 TextChunk {
                     content: enriched_content,
@@ -231,7 +230,6 @@ fn world() {
         let chunker = CodeChunker::default();
         let context = ChunkContext {
             source_path: Some("data.json".to_string()),
-            doc_type: None,
         };
 
         let text = "some text content";
@@ -258,7 +256,6 @@ fn world() {
         let chunker = CodeChunker::default();
         let context = ChunkContext {
             source_path: Some("module.py".to_string()),
-            doc_type: None,
         };
 
         let code = r#"
@@ -281,7 +278,6 @@ def world():
         let chunker = CodeChunker::default();
         let context = ChunkContext {
             source_path: Some("app.ts".to_string()),
-            doc_type: None,
         };
 
         let code = r#"
@@ -306,7 +302,6 @@ function farewell(name: string): void {
         let chunker = CodeChunker::default();
         let context = ChunkContext {
             source_path: Some("main.rs".to_string()),
-            doc_type: None,
         };
 
         let chunks = chunker.chunk("", Some(&context));
@@ -321,7 +316,6 @@ function farewell(name: string): void {
         let chunker = CodeChunker::default();
         let context = ChunkContext {
             source_path: Some("broken.rs".to_string()),
-            doc_type: None,
         };
 
         let code = r#"
@@ -368,7 +362,6 @@ fn world() {
         let chunker = CodeChunker::default();
         let context = ChunkContext {
             source_path: Some("src/lib.rs".to_string()),
-            doc_type: None,
         };
 
         let code = r#"use std::collections::HashMap;
@@ -402,7 +395,6 @@ fn other() {
         };
         let context = ChunkContext {
             source_path: Some("src/lib.rs".to_string()),
-            doc_type: None,
         };
 
         let code = r#"fn alpha() {

@@ -11,6 +11,7 @@ use crate::error::{MomoError, Result};
 /// Result from reranking operation
 #[derive(Debug, Clone)]
 pub struct RerankResult {
+    #[allow(dead_code)]
     pub document: String,
     pub score: f32,
     pub index: usize,
@@ -19,6 +20,8 @@ pub struct RerankResult {
 #[derive(Clone)]
 enum RerankerBackend {
     Local(Arc<Mutex<TextRerank>>),
+    #[allow(dead_code)]
+    Mock(Arc<Vec<RerankResult>>),
 }
 
 /// Thread-safe reranker provider wrapping FastEmbed's TextRerank
@@ -81,6 +84,7 @@ impl RerankerProvider {
         }
     }
 
+    #[allow(dead_code)]
     pub fn is_supported_model(model_name: &str) -> bool {
         Self::parse_model(model_name).is_ok()
     }
@@ -118,6 +122,15 @@ impl RerankerProvider {
                     .map(RerankResult::from)
                     .collect())
             }
+            RerankerBackend::Mock(results) => Ok(results.iter().take(top_k).cloned().collect()),
+        }
+    }
+
+    #[allow(dead_code)]
+    pub fn new_mock(results: Vec<RerankResult>) -> Self {
+        Self {
+            backend: Some(RerankerBackend::Mock(Arc::new(results))),
+            batch_size: 64,
         }
     }
 }
@@ -178,7 +191,6 @@ mod tests {
         let config = RerankerConfig {
             enabled: false,
             model: "bge-reranker-base".to_string(),
-            top_k: 10,
             cache_dir: ".fastembed_cache".to_string(),
             batch_size: 64,
             domain_models: HashMap::new(),
@@ -193,7 +205,6 @@ mod tests {
         let config = RerankerConfig {
             enabled: false,
             model: "bge-reranker-base".to_string(),
-            top_k: 10,
             cache_dir: ".fastembed_cache".to_string(),
             batch_size: 64,
             domain_models: HashMap::new(),
@@ -213,7 +224,6 @@ mod tests {
         let config = RerankerConfig {
             enabled: false,
             model: "bge-reranker-base".to_string(),
-            top_k: 10,
             cache_dir: ".fastembed_cache".to_string(),
             batch_size: 64,
             domain_models: HashMap::new(),
@@ -255,4 +265,3 @@ mod tests {
         assert_eq!(result.index, 1);
     }
 }
-

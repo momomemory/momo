@@ -71,9 +71,9 @@ impl ProfileGenerator {
             return Ok(HashMap::new());
         }
 
-        // If very few facts, maybe skip compaction? 
+        // If very few facts, maybe skip compaction?
         // For now we process even small lists to get categorization
-        
+
         let prompt = fact_compaction_prompt(facts);
         // We can deserialize directly into the wrapper struct
         let response: CompactedFacts = self.llm.complete_structured(&prompt).await?;
@@ -109,7 +109,6 @@ mod tests {
             query_rewrite_timeout_secs: 2,
             enable_auto_relations: false,
             enable_contradiction_detection: false,
-            enable_llm_filter: false,
             filter_prompt: None,
         };
         LlmProvider::new(Some(&config))
@@ -153,10 +152,7 @@ mod tests {
     async fn generate_narrative_returns_empty_for_empty_memories() {
         let llm_server = MockServer::start().await;
         let gen = ProfileGenerator::new(test_llm_provider(llm_server.uri()));
-        let result = gen
-            .generate_narrative(&[])
-            .await
-            .expect("should not fail");
+        let result = gen.generate_narrative(&[]).await.expect("should not fail");
         assert!(result.is_empty());
     }
 
@@ -238,10 +234,7 @@ mod tests {
     async fn compact_facts_returns_empty_for_empty_facts() {
         let llm_server = MockServer::start().await;
         let gen = ProfileGenerator::new(test_llm_provider(llm_server.uri()));
-        let result = gen
-            .compact_facts(&[])
-            .await
-            .expect("should not fail");
+        let result = gen.compact_facts(&[]).await.expect("should not fail");
         assert!(result.is_empty());
     }
 
@@ -321,9 +314,9 @@ mod tests {
         let llm_server = MockServer::start().await;
         Mock::given(method("POST"))
             .and(path("/chat/completions"))
-            .respond_with(ResponseTemplate::new(200).set_body_json(llm_response(
-                r#"not valid json at all"#,
-            )))
+            .respond_with(
+                ResponseTemplate::new(200).set_body_json(llm_response(r#"not valid json at all"#)),
+            )
             .mount(&llm_server)
             .await;
 

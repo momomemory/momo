@@ -81,9 +81,7 @@ impl LlmFilter {
         if content.contains(filter_prompt) {
             return Ok(FilterResult {
                 decision: FilterDecision::Include,
-                reasoning: Some(format!(
-                    "Content matches filter string: {filter_prompt}"
-                )),
+                reasoning: Some(format!("Content matches filter string: {filter_prompt}")),
             });
         }
 
@@ -96,7 +94,11 @@ impl LlmFilter {
         }
 
         let prompt = prompts::llm_filter_prompt(content, filter_prompt);
-        match self.llm.complete_structured::<FilterResponse>(&prompt).await {
+        match self
+            .llm
+            .complete_structured::<FilterResponse>(&prompt)
+            .await
+        {
             Ok(response) => {
                 let decision = match response.decision.to_lowercase().as_str() {
                     "include" => FilterDecision::Include,
@@ -111,9 +113,9 @@ impl LlmFilter {
                 };
 
                 let reasoning = if decision == FilterDecision::Skip {
-                    response.reasoning.map(|r| {
-                        r.chars().take(50).collect::<String>()
-                    })
+                    response
+                        .reasoning
+                        .map(|r| r.chars().take(50).collect::<String>())
                 } else {
                     response.reasoning
                 };
@@ -126,7 +128,10 @@ impl LlmFilter {
                     "LLM filter decision"
                 );
 
-                Ok(FilterResult { decision, reasoning })
+                Ok(FilterResult {
+                    decision,
+                    reasoning,
+                })
             }
             Err(MomoError::LlmUnavailable(reason)) => {
                 tracing::warn!(%reason, "LLM unavailable during filtering");
@@ -170,16 +175,10 @@ mod tests {
                 model: "BAAI/bge-small-en-v1.5".to_string(),
                 dimensions: 384,
                 batch_size: 8,
-                api_key: None,
-                base_url: None,
-                rate_limit: None,
-                timeout_secs: 5,
-                max_retries: 0,
             },
             processing: ProcessingConfig {
                 chunk_size: 512,
                 chunk_overlap: 50,
-                max_content_length: 10_000_000,
             },
             memory: MemoryConfig {
                 episode_decay_days: 30.0,
@@ -270,7 +269,7 @@ mod tests {
     #[tokio::test]
     async fn test_filter_content_string_matching() {
         use crate::config::LlmConfig;
-        
+
         let mut config = test_config();
         config.llm = Some(LlmConfig {
             model: "openai/gpt-4o-mini".to_string(),
@@ -283,14 +282,19 @@ mod tests {
             query_rewrite_timeout_secs: 2,
             enable_auto_relations: false,
             enable_contradiction_detection: false,
-            enable_llm_filter: true,
+
             filter_prompt: Some("technical".to_string()),
         });
         let llm = test_llm_unavailable();
         let filter = LlmFilter::new(llm, config);
 
         let result = filter
-            .filter_content("This is a technical document about Rust", "user_123", "doc_123", None)
+            .filter_content(
+                "This is a technical document about Rust",
+                "user_123",
+                "doc_123",
+                None,
+            )
             .await
             .expect("filter_content should not fail");
 
@@ -383,7 +387,7 @@ mod tests {
             query_rewrite_timeout_secs: 2,
             enable_auto_relations: false,
             enable_contradiction_detection: false,
-            enable_llm_filter: true,
+
             filter_prompt: Some("technical documents only".to_string()),
         });
 
@@ -391,7 +395,12 @@ mod tests {
         let filter = LlmFilter::new(llm, config);
 
         let result = filter
-            .filter_content("This is about marketing strategies", "user_123", "doc_123", None)
+            .filter_content(
+                "This is about marketing strategies",
+                "user_123",
+                "doc_123",
+                None,
+            )
             .await
             .expect("filter should work");
 
@@ -439,7 +448,7 @@ mod tests {
             query_rewrite_timeout_secs: 2,
             enable_auto_relations: false,
             enable_contradiction_detection: false,
-            enable_llm_filter: true,
+
             filter_prompt: Some("technical documents only".to_string()),
         });
 
@@ -447,14 +456,22 @@ mod tests {
         let filter = LlmFilter::new(llm, config);
 
         let result = filter
-            .filter_content("This is about marketing strategies", "user_123", "doc_123", None)
+            .filter_content(
+                "This is about marketing strategies",
+                "user_123",
+                "doc_123",
+                None,
+            )
             .await
             .expect("filter should work");
 
         assert_eq!(result.decision, FilterDecision::Skip);
         assert!(result.reasoning.is_some());
         let reasoning = result.reasoning.unwrap();
-        assert!(reasoning.len() <= 50, "Reasoning should be redacted to 50 chars");
+        assert!(
+            reasoning.len() <= 50,
+            "Reasoning should be redacted to 50 chars"
+        );
         assert_eq!(reasoning.len(), 50);
     }
 
@@ -486,7 +503,7 @@ mod tests {
             query_rewrite_timeout_secs: 2,
             enable_auto_relations: false,
             enable_contradiction_detection: false,
-            enable_llm_filter: true,
+
             filter_prompt: Some("technical documents only".to_string()),
         });
 
@@ -542,7 +559,7 @@ mod tests {
             query_rewrite_timeout_secs: 2,
             enable_auto_relations: false,
             enable_contradiction_detection: false,
-            enable_llm_filter: true,
+
             filter_prompt: Some("technical documents only".to_string()),
         });
 
@@ -573,7 +590,7 @@ mod tests {
             query_rewrite_timeout_secs: 2,
             enable_auto_relations: false,
             enable_contradiction_detection: false,
-            enable_llm_filter: true,
+
             filter_prompt: Some("global prompt".to_string()),
         });
         let llm = test_llm_unavailable();

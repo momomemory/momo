@@ -15,6 +15,7 @@ pub struct Chunk {
 }
 
 impl Chunk {
+    #[allow(dead_code)] // Public API constructor
     pub fn new(id: String, document_id: String, content: String, position: i32) -> Self {
         Self {
             id,

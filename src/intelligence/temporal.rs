@@ -32,6 +32,7 @@ impl TemporalSearchRanker {
     }
 
     /// Check if forgotten memories should be included based on options
+    #[allow(dead_code)]
     pub fn should_include_forgotten(&self, include_options: &SearchIncludeOptions) -> bool {
         include_options.forgotten_memories.unwrap_or(false)
     }

@@ -5,9 +5,9 @@ use chrono::{DateTime, Utc};
 
 use crate::error::Result;
 use crate::models::{
-    CachedProfile, Chunk, ChunkWithDocument, ContainerFilter, Document, DocumentSummary,
-    GraphData, GraphEdgeType, ListDocumentsRequest, Memory, MemoryRelationType, MemorySearchHit,
-    MemorySource, Pagination, ProcessingDocument, ProcessingStatus, UserProfile,
+    CachedProfile, Chunk, ChunkWithDocument, ContainerFilter, Document, DocumentSummary, GraphData,
+    GraphEdgeType, ListDocumentsRequest, Memory, MemoryRelationType, MemorySearchHit, MemorySource,
+    Pagination, ProcessingDocument, ProcessingStatus, UserProfile,
 };
 
 // ---------------------------------------------------------------------------
@@ -129,11 +129,7 @@ pub trait MemoryStore: Send + Sync {
         max_nodes: u32,
         relation_types: Option<&[GraphEdgeType]>,
     ) -> Result<GraphData>;
-    async fn get_container_graph(
-        &self,
-        container_tag: &str,
-        max_nodes: u32,
-    ) -> Result<GraphData>;
+    async fn get_container_graph(&self, container_tag: &str, max_nodes: u32) -> Result<GraphData>;
     async fn get_cached_profile(&self, container_tag: &str) -> Result<Option<CachedProfile>>;
     async fn upsert_cached_profile(
         &self,
@@ -149,11 +145,7 @@ pub trait MemoryStore: Send + Sync {
     async fn get_episode_decay_candidates(&self) -> Result<Vec<EpisodeDecayCandidate>>;
 
     /// Set `forget_after` on a memory (must not be forgotten or static).
-    async fn set_memory_forget_after(
-        &self,
-        id: &str,
-        forget_after: DateTime<Utc>,
-    ) -> Result<u64>;
+    async fn set_memory_forget_after(&self, id: &str, forget_after: DateTime<Utc>) -> Result<u64>;
 
     // -- Profile refresh helpers -----------------------------------------------
 
@@ -161,10 +153,8 @@ pub trait MemoryStore: Send + Sync {
     async fn get_active_container_tags(&self) -> Result<Vec<String>>;
 
     /// Return `MAX(updated_at)` for active memories with the given container_tag.
-    async fn get_max_memory_updated_at(
-        &self,
-        container_tag: &str,
-    ) -> Result<Option<DateTime<Utc>>>;
+    async fn get_max_memory_updated_at(&self, container_tag: &str)
+        -> Result<Option<DateTime<Utc>>>;
 }
 
 /// CRUD operations for memory-to-source links.

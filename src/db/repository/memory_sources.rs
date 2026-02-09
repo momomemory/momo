@@ -66,6 +66,7 @@ impl MemorySourcesRepository {
         Ok(results)
     }
 
+    #[allow(dead_code)]
     pub async fn get_by_document(
         conn: &Connection,
         document_id: &str,

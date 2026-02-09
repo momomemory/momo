@@ -177,11 +177,8 @@ impl MemoryExtractor {
                 .await?;
 
             if let Some(existing) = similar.first().map(|hit| &hit.memory) {
-                db.update_memory_source_count(
-                    &existing.id,
-                    existing.source_count + 1,
-                )
-                .await?;
+                db.update_memory_source_count(&existing.id, existing.source_count + 1)
+                    .await?;
                 tracing::debug!(memory_id = %existing.id, "Found duplicate, incremented source_count");
             } else {
                 result.push(memory);
@@ -218,34 +215,13 @@ mod tests {
     use crate::config::{EmbeddingsConfig, LlmConfig};
 
     async fn test_embeddings_provider() -> EmbeddingProvider {
-        let mock_server = MockServer::start().await;
-
-        Mock::given(method("POST"))
-            .and(path("/embeddings"))
-            .respond_with(ResponseTemplate::new(200).set_body_json(json!({
-                "data": [
-                    {
-                        "embedding": [0.1, 0.2, 0.3]
-                    }
-                ]
-            })))
-            .mount(&mock_server)
-            .await;
-
         let config = EmbeddingsConfig {
-            model: "openai/text-embedding-3-small".to_string(),
-            dimensions: 3,
+            model: "BAAI/bge-small-en-v1.5".to_string(),
+            dimensions: 384,
             batch_size: 8,
-            api_key: Some("test-key".to_string()),
-            base_url: Some(mock_server.uri()),
-            rate_limit: None,
-            timeout_secs: 5,
-            max_retries: 0,
         };
 
-        EmbeddingProvider::new_async(&config)
-            .await
-            .expect("failed to create test embeddings provider")
+        EmbeddingProvider::new(&config).expect("failed to create test embeddings provider")
     }
 
     fn test_llm_unavailable() -> LlmProvider {
@@ -264,7 +240,6 @@ mod tests {
             query_rewrite_timeout_secs: 2,
             enable_auto_relations: false,
             enable_contradiction_detection: false,
-            enable_llm_filter: false,
             filter_prompt: None,
         };
 

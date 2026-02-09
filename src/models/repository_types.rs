@@ -21,6 +21,7 @@ pub struct GraphData {
 /// A cached user profile entry.
 #[derive(Debug, Clone)]
 pub struct CachedProfile {
+    #[allow(dead_code)] // Part of DB schema mapping
     pub container_tag: String,
     pub narrative: Option<String>,
     pub summary: Option<String>,
