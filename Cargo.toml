@@ -1,14 +1,14 @@
 [package]
 name = "momo"
-version.workspace = true
-edition.workspace = true
-authors.workspace = true
+version = "0.1.0"
+edition = "2021"
+authors = ["Momo Contributors"]
 description = "Open-source, self-hostable AI memory system inspired by Supermemory. Named after Aang's loyal flying lemur."
-license.workspace = true
-repository.workspace = true
-keywords.workspace = true
-categories.workspace = true
-rust-version.workspace = true
+license = "MIT"
+repository = "https://github.com/watzon/mnemo"
+keywords = ["ai", "memory", "rag", "embeddings", "vector-search"]
+categories = ["database", "web-programming"]
+rust-version = "1.75"
 
 [lib]
 name = "momo"
@@ -20,129 +20,139 @@ path = "src/main.rs"
 
 [dependencies]
 # Web Framework
-axum = { workspace = true }
-axum-extra = { workspace = true }
-tower = { workspace = true }
-tower-http = { workspace = true }
+axum = { version = "0.8", features = ["macros", "multipart"] }
+axum-extra = { version = "0.10", features = ["typed-header", "query"] }
+tower = "0.5"
+tower-http = { version = "0.6", features = ["cors", "trace", "limit"] }
 
 # OpenAPI Documentation
-utoipa = { workspace = true }
-utoipa-axum = { workspace = true }
-utoipa-redoc = { workspace = true }
+utoipa = { version = "5", features = ["axum_extras"] }
+utoipa-axum = "0.2"
+utoipa-redoc = { version = "6", features = ["axum"] }
 
 # Async Runtime
-tokio = { workspace = true }
-tokio-util = { workspace = true }
+tokio = { version = "1", features = ["full"] }
+tokio-util = { version = "0.7", features = ["rt"] }
 
 # CLI
-clap = { workspace = true }
+clap = { version = "4", features = ["derive"] }
 
 # Database
-libsql = { workspace = true }
-lru = { workspace = true }
+libsql = { version = "0.6", features = ["replication", "remote"] }
+lru = "0.12"
 
 # Embeddings
-fastembed = { workspace = true }
+fastembed = "5"
 
 # LLM
-async-openai = { workspace = true }
-backoff = { workspace = true }
+async-openai = "0.28"
+backoff = "0.4"
 
 # Serialization
-serde = { workspace = true }
-serde_json = { workspace = true }
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"
 
 # HTTP Client
-reqwest = { workspace = true }
+reqwest = { version = "0.12", features = ["json", "multipart", "stream"] }
 
 # Error Handling
-anyhow = { workspace = true }
-thiserror = { workspace = true }
+anyhow = "1"
+thiserror = "2"
 
 # IDs
-nanoid = { workspace = true }
-uuid = { workspace = true }
+nanoid = "0.4"
+uuid = { version = "1", features = ["v4", "serde"] }
 
 # Validation
-validator = { workspace = true }
+validator = { version = "0.19", features = ["derive"] }
 
 # Logging & Tracing
-tracing = { workspace = true }
-tracing-subscriber = { workspace = true }
+tracing = "0.1"
+tracing-subscriber = { version = "0.3", features = ["env-filter", "json"] }
 
 # Configuration
-dotenvy = { workspace = true }
-config = { workspace = true }
+dotenvy = "0.15"
+config = "0.14"
 
 # Time & Date
-chrono = { workspace = true }
+chrono = { version = "0.4", features = ["serde"] }
 
 # Text Processing
-regex = { workspace = true }
-unicode-segmentation = { workspace = true }
-html2text = { workspace = true }
-htmd = { workspace = true }
-scraper = { workspace = true }
-url = { workspace = true }
+regex = "1"
+unicode-segmentation = "1"
+html2text = "0.14"
+htmd = "0.1"
+scraper = "0.22"
+url = { version = "2", features = ["serde"] }
 
 # AST-aware code chunking
-text-splitter = { workspace = true }
-tree-sitter = { workspace = true }
-tree-sitter-rust = { workspace = true }
-tree-sitter-python = { workspace = true }
-tree-sitter-javascript = { workspace = true }
-tree-sitter-typescript = { workspace = true }
-tree-sitter-go = { workspace = true }
-tree-sitter-java = { workspace = true }
-tree-sitter-c = { workspace = true }
-tree-sitter-cpp = { workspace = true }
+text-splitter = { version = "0.29", features = ["code", "markdown"] }
+tree-sitter = "0.26"
+tree-sitter-rust = "0.23"
+tree-sitter-python = "0.23"
+tree-sitter-javascript = "0.23"
+tree-sitter-typescript = "0.23"
+tree-sitter-go = "0.23"
+tree-sitter-java = "0.23"
+tree-sitter-c = "0.23"
+tree-sitter-cpp = "0.23"
 
 # Async utilities
-futures = { workspace = true }
-async-trait = { workspace = true }
-async-stream = { workspace = true }
+futures = "0.3"
+async-trait = "0.1"
+async-stream = "0.3"
 
 # Base64 encoding
-base64 = { workspace = true }
+base64 = "0.22"
 
 # Hashing
-sha2 = { workspace = true }
+sha2 = "0.10"
 
 # Content type detection
-infer = { workspace = true }
+infer = "0.19"
 
 # PDF extraction
-pdf-extract = { workspace = true }
+pdf-extract = "0.8"
 
 # OCR
-leptess = { workspace = true }
+leptess = "0.14"
 
 # Image processing
-image = { workspace = true }
+image = "0.25"
 
 # Audio transcription
-whisper-rs = { workspace = true }
-symphonia = { workspace = true }
-rubato = { workspace = true }
+whisper-rs = "0.15"
+symphonia = { version = "0.5", features = ["mp3", "isomp4", "wav", "pcm"] }
+rubato = "0.16"
 
 # Markdown
-pulldown-cmark = { workspace = true }
+pulldown-cmark = "0.12"
 
 # Office document extraction
-docx-rs = { workspace = true }
-calamine = { workspace = true }
-zip = { workspace = true }
-quick-xml = { workspace = true }
-csv = { workspace = true }
+docx-rs = "0.4"
+calamine = "0.33"
+zip = "7"
+quick-xml = "0.39"
+csv = "1"
 
 [dev-dependencies]
-tokio-test = { workspace = true }
-pretty_assertions = { workspace = true }
-tempfile = { workspace = true }
-wiremock = { workspace = true }
-serial_test = { workspace = true }
+tokio-test = "0.4"
+pretty_assertions = "1"
+tempfile = "3"
+wiremock = "0.6"
+serial_test = "0.5"
 
 [features]
 default = ["local-embeddings"]
 local-embeddings = []
 openai-embeddings = []
+
+[profile.release]
+lto = true
+codegen-units = 1
+panic = "abort"
+strip = true
+
+[profile.dev]
+opt-level = 0
+debug = true

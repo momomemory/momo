@@ -3,12 +3,22 @@ FROM rust:1.75-bookworm as builder
 WORKDIR /app
 COPY . .
 
+RUN apt-get update && \
+    apt-get install -y --no-install-recommends \
+      pkg-config \
+      libssl-dev \
+      clang \
+      cmake \
+      libleptonica-dev \
+      libtesseract-dev && \
+    rm -rf /var/lib/apt/lists/*
+
 RUN cargo build --release
 
 FROM debian:bookworm-slim
 
 RUN apt-get update && \
-    apt-get install -y ca-certificates tesseract-ocr tesseract-ocr-eng && \
+    apt-get install -y --no-install-recommends ca-certificates tesseract-ocr tesseract-ocr-eng && \
     rm -rf /var/lib/apt/lists/*
 
 COPY --from=builder /app/target/release/momo /usr/local/bin/momo
