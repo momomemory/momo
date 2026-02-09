@@ -1,6 +1,6 @@
 [package]
 name = "momo"
-version = "0.1.0"
+version = "0.2.0"
 edition = "2021"
 authors = ["Momo Contributors"]
 description = "Open-source, self-hostable AI memory system inspired by Supermemory. Named after Aang's loyal flying lemur."
