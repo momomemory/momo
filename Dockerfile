@@ -3,6 +3,8 @@ FROM rust:1-bookworm AS builder
 WORKDIR /app
 COPY . .
 
+ARG TARGETARCH
+
 RUN apt-get update && \
     apt-get install -y --no-install-recommends \
       pkg-config \
@@ -13,7 +15,13 @@ RUN apt-get update && \
       libtesseract-dev && \
     rm -rf /var/lib/apt/lists/*
 
-RUN cargo build --release
+RUN if [ "$TARGETARCH" = "arm64" ]; then \
+      export WHISPER_GGML_NATIVE=OFF; \
+      export WHISPER_GGML_CPU_ARM_ARCH=armv8.5-a; \
+      export CMAKE_C_FLAGS="-march=armv8.5-a"; \
+      export CMAKE_CXX_FLAGS="-march=armv8.5-a"; \
+    fi; \
+    cargo build --release
 
 FROM debian:bookworm-slim
 
