@@ -42,7 +42,7 @@ libsql = { version = "0.6", features = ["replication", "remote"] }
 lru = "0.12"
 
 # Embeddings
-fastembed = "5"
+fastembed = { version = "5", default-features = false, features = ["hf-hub-native-tls", "image-models", "ort-load-dynamic"] }
 
 # LLM
 async-openai = "0.28"

@@ -165,9 +165,19 @@ jobs:
         with:
           key: release-${{ matrix.target }}
 
-      - name: Build release binary
+      - name: Build release binary (Apple Silicon)
+        if: matrix.target == 'aarch64-apple-darwin'
+        env:
+          SOURCE_DATE_EPOCH: "1"
+          CMAKE_C_FLAGS: "-march=armv8.5-a"
+          CMAKE_CXX_FLAGS: "-march=armv8.5-a"
         run: |
-          cargo build --release --target ${{ matrix.target }}
+          cargo build --locked --release --target ${{ matrix.target }}
+
+      - name: Build release binary (other targets)
+        if: matrix.target != 'aarch64-apple-darwin'
+        run: |
+          cargo build --locked --release --target ${{ matrix.target }}
 
       - name: Package binary
         shell: bash
