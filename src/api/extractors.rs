@@ -5,6 +5,7 @@ use crate::error::MomoError;
 
 #[derive(FromRequest)]
 #[from_request(via(axum::Json), rejection(MomoError))]
+#[allow(dead_code)]
 pub struct AppJson<T>(pub T);
 
 impl From<JsonRejection> for MomoError {

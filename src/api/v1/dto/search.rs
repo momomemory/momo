@@ -9,7 +9,7 @@ use crate::models;
 /// Search scope determines which indices to query.
 ///
 /// Wire format: `"documents"`, `"memories"`, or `"hybrid"`.
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, utoipa::ToSchema)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, utoipa::ToSchema, Default)]
 #[serde(rename_all = "camelCase")]
 pub enum SearchScope {
     /// Search document chunks only.
@@ -17,13 +17,8 @@ pub enum SearchScope {
     /// Search memories only.
     Memories,
     /// Search both documents and memories (default).
+    #[default]
     Hybrid,
-}
-
-impl Default for SearchScope {
-    fn default() -> Self {
-        Self::Hybrid
-    }
 }
 
 impl From<SearchScope> for models::SearchMode {

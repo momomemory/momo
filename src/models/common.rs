@@ -3,10 +3,11 @@ use std::collections::HashMap;
 
 pub type Metadata = HashMap<String, serde_json::Value>;
 
-#[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Default)]
 #[serde(rename_all = "snake_case")]
 pub enum ProcessingStatus {
     Unknown,
+    #[default]
     Queued,
     Extracting,
     Chunking,
@@ -14,12 +15,6 @@ pub enum ProcessingStatus {
     Indexing,
     Done,
     Failed,
-}
-
-impl Default for ProcessingStatus {
-    fn default() -> Self {
-        Self::Queued
-    }
 }
 
 impl std::fmt::Display for ProcessingStatus {
@@ -55,9 +50,10 @@ impl std::str::FromStr for ProcessingStatus {
     }
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Default)]
 #[serde(rename_all = "snake_case")]
 pub enum DocumentType {
+    #[default]
     Text,
     Pdf,
     Webpage,
@@ -77,12 +73,6 @@ pub enum DocumentType {
     Pptx,
     Xlsx,
     Unknown,
-}
-
-impl Default for DocumentType {
-    fn default() -> Self {
-        Self::Text
-    }
 }
 
 impl std::fmt::Display for DocumentType {
@@ -191,21 +181,16 @@ impl Pagination {
 }
 
 /// Type of memory extracted from content
-#[derive(Debug, Clone, Copy, Serialize, Deserialize, PartialEq, Eq)]
+#[derive(Debug, Clone, Copy, Serialize, Deserialize, PartialEq, Eq, Default)]
 #[serde(rename_all = "snake_case")]
 pub enum MemoryType {
     /// Factual information about the user or topic
+    #[default]
     Fact,
     /// User preference or choice
     Preference,
     /// Event or experience
     Episode,
-}
-
-impl Default for MemoryType {
-    fn default() -> Self {
-        Self::Fact
-    }
 }
 
 impl std::fmt::Display for MemoryType {
