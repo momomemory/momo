@@ -218,53 +218,29 @@ pub async fn list_memories(
 
     let offset = (page - 1) * limit;
 
-    // Use get_user_profile to fetch memories for the container tag.
+    // Use get_container_graph to fetch actual memory rows for the container.
     // We request a large limit and paginate in-memory, since the DB trait
     // doesn't expose a dedicated list_memories method.
     let fetch_limit = offset + limit + 1; // +1 to detect if there's a next page
-    let profile = match state
+    let graph = match state
         .db
-        .get_user_profile(&container_tag, true, fetch_limit)
+        .get_container_graph(&container_tag, fetch_limit)
         .await
     {
-        Ok(p) => p,
+        Ok(g) => g,
         Err(e) => return e.into(),
     };
 
-    // Combine static + dynamic facts
-    let all_facts: Vec<_> = profile
-        .static_facts
-        .into_iter()
-        .chain(profile.dynamic_facts.into_iter())
-        .collect();
-
-    let total = all_facts.len() as u64;
+    let all_memories = graph.memories;
+    let total = all_memories.len() as u64;
     let start = offset as usize;
-    let end = (start + limit as usize).min(all_facts.len());
 
-    let memories: Vec<MemoryResponse> = if start < all_facts.len() {
-        all_facts[start..end]
-            .iter()
-            .enumerate()
-            .map(|(i, fact)| MemoryResponse {
-                memory_id: format!("{}_{}", container_tag, start + i),
-                content: fact.memory.clone(),
-                container_tag: Some(container_tag.clone()),
-                memory_type: crate::api::v1::dto::V1MemoryType::Fact,
-                version: 1,
-                is_latest: true,
-                is_inference: false,
-                is_forgotten: false,
-                is_static: false,
-                confidence: fact.confidence,
-                metadata: Default::default(),
-                created_at: fact.created_at,
-                updated_at: fact.created_at,
-            })
-            .collect()
-    } else {
-        Vec::new()
-    };
+    let memories: Vec<MemoryResponse> = all_memories
+        .into_iter()
+        .skip(start)
+        .take(limit as usize)
+        .map(MemoryResponse::from)
+        .collect();
 
     let has_more = total > (offset + limit) as u64;
     let next_cursor = if has_more {
