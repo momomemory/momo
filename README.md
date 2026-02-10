@@ -29,6 +29,7 @@ Then open:
 
 - Web console: `http://localhost:3000/`
 - API docs: `http://localhost:3000/api/v1/docs`
+- MCP endpoint: `http://localhost:3000/mcp`
 
 ### Add a Memory
 ```bash
@@ -43,6 +44,31 @@ curl -X POST http://localhost:3000/api/v1/search \
   -H "Content-Type: application/json" \
   -d '{"q": "What are the user preferences?", "containerTags": ["user_1"], "scope": "hybrid"}'
 ```
+
+### Use As MCP Server
+
+Momo includes a built-in MCP server (streamable HTTP) compatible with Supermemory-style workflows.
+
+```json
+{
+  "mcpServers": {
+    "momo": {
+      "url": "http://localhost:3000/mcp",
+      "headers": {
+        "Authorization": "Bearer your_momo_api_key",
+        "x-sm-project": "default"
+      }
+    }
+  }
+}
+```
+
+Provided MCP primitives:
+- Tools: `memory`, `recall`, `listProjects`, `whoAmI`
+- Resources: `supermemory://profile`, `supermemory://projects`
+- Prompt: `context`
+
+For handshake details, manual `curl` testing, and troubleshooting, see [MCP Guide](./docs/mcp.md).
 
 ## Features
 
@@ -67,6 +93,7 @@ For detailed documentation, see the [docs](./docs/README.md) directory.
 
 - [Full Documentation](./docs/README.md)
 - [API Reference](./docs/api.md)
+- [MCP Guide](./docs/mcp.md)
 - [Self-Hosting Guide](./docs/self-hosting.md)
 
 ## SDKs

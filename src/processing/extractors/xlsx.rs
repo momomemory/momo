@@ -140,8 +140,8 @@ mod tests {
         );
         assert_eq!(XlsxExtractor::format_cell_value(Some(&Data::Int(42))), "42");
         assert_eq!(
-            XlsxExtractor::format_cell_value(Some(&Data::Float(3.14))),
-            "3.14"
+            XlsxExtractor::format_cell_value(Some(&Data::Float(2.5))),
+            "2.5"
         );
         assert_eq!(
             XlsxExtractor::format_cell_value(Some(&Data::Bool(true))),

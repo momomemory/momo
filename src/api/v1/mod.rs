@@ -14,8 +14,8 @@ mod tests {
     use crate::api::routes::create_router;
     use crate::api::state::AppState;
     use crate::config::{
-        Config, DatabaseConfig, EmbeddingsConfig, InferenceConfig, MemoryConfig, OcrConfig,
-        ProcessingConfig, ServerConfig, TranscriptionConfig,
+        Config, DatabaseConfig, EmbeddingsConfig, InferenceConfig, McpConfig, MemoryConfig,
+        OcrConfig, ProcessingConfig, ServerConfig, TranscriptionConfig,
     };
 
     async fn test_state(api_keys: Vec<String>) -> AppState {
@@ -25,6 +25,7 @@ mod tests {
                 port: 3000,
                 api_keys,
             },
+            mcp: McpConfig::default(),
             database: DatabaseConfig {
                 url: "file::memory:".to_string(),
                 auth_token: None,

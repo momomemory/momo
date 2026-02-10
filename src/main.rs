@@ -5,6 +5,7 @@ mod embeddings;
 mod error;
 mod intelligence;
 mod llm;
+mod mcp;
 mod migration;
 mod models;
 mod ocr;
@@ -279,6 +280,9 @@ async fn main() -> anyhow::Result<()> {
     tracing::info!("  Health check: http://{}/api/v1/health", addr);
     tracing::info!("  API docs:     http://{}/api/v1/docs", addr);
     tracing::info!("  OpenAPI spec: http://{}/api/v1/openapi.json", addr);
+    if config.mcp.enabled {
+        tracing::info!("  MCP endpoint: http://{}{}", addr, config.mcp.path);
+    }
 
     let listener = tokio::net::TcpListener::bind(&addr).await?;
     axum::serve(listener, app)

@@ -46,6 +46,7 @@ fn parse_domain_models() -> HashMap<String, String> {
 #[derive(Debug, Clone, Deserialize)]
 pub struct Config {
     pub server: ServerConfig,
+    pub mcp: McpConfig,
     pub database: DatabaseConfig,
     pub embeddings: EmbeddingsConfig,
     pub processing: ProcessingConfig,
@@ -61,6 +62,17 @@ pub struct ServerConfig {
     pub host: String,
     pub port: u16,
     pub api_keys: Vec<String>,
+}
+
+#[derive(Debug, Clone, Deserialize)]
+pub struct McpConfig {
+    pub enabled: bool,
+    pub path: String,
+    pub require_auth: bool,
+    pub public_url: Option<String>,
+    pub default_container_tag: String,
+    pub project_header: String,
+    pub oauth_authorization_server: Option<String>,
 }
 
 #[derive(Debug, Clone, Deserialize)]
@@ -196,6 +208,7 @@ impl Default for Config {
                     .map(|keys| keys.split(',').map(|s| s.trim().to_string()).collect())
                     .unwrap_or_default(),
             },
+            mcp: McpConfig::default(),
             database: DatabaseConfig {
                 url: env::var("DATABASE_URL").unwrap_or_else(|_| "file:momo.db".to_string()),
                 auth_token: env::var("DATABASE_AUTH_TOKEN").ok(),
@@ -280,6 +293,28 @@ impl Default for Config {
                     None
                 }
             },
+        }
+    }
+}
+
+impl Default for McpConfig {
+    fn default() -> Self {
+        let path = env::var("MOMO_MCP_PATH").unwrap_or_else(|_| "/mcp".to_string());
+
+        Self {
+            enabled: parse_env_or("MOMO_MCP_ENABLED", true),
+            path: if path.starts_with('/') {
+                path
+            } else {
+                format!("/{path}")
+            },
+            require_auth: parse_env_or("MOMO_MCP_REQUIRE_AUTH", true),
+            public_url: env::var("MOMO_MCP_PUBLIC_URL").ok(),
+            default_container_tag: env::var("MOMO_MCP_DEFAULT_CONTAINER_TAG")
+                .unwrap_or_else(|_| "default".to_string()),
+            project_header: env::var("MOMO_MCP_PROJECT_HEADER")
+                .unwrap_or_else(|_| "x-sm-project".to_string()),
+            oauth_authorization_server: env::var("MOMO_MCP_AUTHORIZATION_SERVER").ok(),
         }
     }
 }
@@ -490,5 +525,31 @@ mod tests {
         let result: u16 = parse_env_or("__TEST_PARSE_PORT", 3000);
         assert_eq!(result, 8080);
         std::env::remove_var("__TEST_PARSE_PORT");
+    }
+
+    #[test]
+    fn test_mcp_config_defaults() {
+        let _guard = RERANKER_TEST_MUTEX.lock().unwrap();
+        std::env::remove_var("MOMO_MCP_ENABLED");
+        std::env::remove_var("MOMO_MCP_PATH");
+        std::env::remove_var("MOMO_MCP_REQUIRE_AUTH");
+        std::env::remove_var("MOMO_MCP_DEFAULT_CONTAINER_TAG");
+        std::env::remove_var("MOMO_MCP_PROJECT_HEADER");
+
+        let config = Config::default();
+        assert!(config.mcp.enabled);
+        assert_eq!(config.mcp.path, "/mcp");
+        assert!(config.mcp.require_auth);
+        assert_eq!(config.mcp.default_container_tag, "default");
+        assert_eq!(config.mcp.project_header, "x-sm-project");
+    }
+
+    #[test]
+    fn test_mcp_path_normalized_from_env() {
+        let _guard = RERANKER_TEST_MUTEX.lock().unwrap();
+        std::env::set_var("MOMO_MCP_PATH", "custom-mcp");
+        let config = Config::default();
+        assert_eq!(config.mcp.path, "/custom-mcp");
+        std::env::remove_var("MOMO_MCP_PATH");
     }
 }

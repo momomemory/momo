@@ -14,6 +14,7 @@ Momo is a self-hostable AI memory system designed to be a single binary, 100% en
 4. [Running](#running)
 5. [Configuration](#configuration)
    - [Server](#server)
+   - [MCP (Built-in)](#mcp-built-in)
    - [Database](#database)
    - [Embeddings](#embeddings)
    - [Processing](#processing)
@@ -155,6 +156,24 @@ Momo follows a `provider/model` string format for external services (Embeddings,
 | `MOMO_PORT`     | Listen port                                 | `3000`    |
 | `MOMO_API_KEYS` | Comma-separated API keys for authentication | (None)    |
 
+### MCP (Built-in)
+
+| Variable | Description | Default |
+| --- | --- | --- |
+| `MOMO_MCP_ENABLED` | Enable the built-in MCP server routes | `true` |
+| `MOMO_MCP_PATH` | Path for streamable HTTP MCP endpoint | `/mcp` |
+| `MOMO_MCP_REQUIRE_AUTH` | Require Bearer auth for MCP requests | `true` |
+| `MOMO_MCP_DEFAULT_CONTAINER_TAG` | Fallback project/container tag when none provided | `default` |
+| `MOMO_MCP_PROJECT_HEADER` | Header used for project scoping (Supermemory compatible) | `x-sm-project` |
+| `MOMO_MCP_PUBLIC_URL` | Optional public base URL used in OAuth discovery responses | (None) |
+| `MOMO_MCP_AUTHORIZATION_SERVER` | Optional OAuth issuer URL for discovery responses | (None) |
+
+Notes:
+
+- MCP auth keys come from `MOMO_API_KEYS`.
+- When `MOMO_MCP_REQUIRE_AUTH=true` and no API keys are configured, MCP requests are rejected.
+- Full protocol usage and manual examples are documented in [MCP Guide](./mcp.md).
+
 ### Database
 
 | Variable              | Description                      | Default        |
@@ -209,7 +228,7 @@ Momo follows a `provider/model` string format for external services (Embeddings,
 | `EPISODE_FORGET_GRACE_DAYS`      | Grace period before permanent forget  | `7`             |
 | `FORGETTING_CHECK_INTERVAL`      | Interval in seconds                   | `3600`          |
 | `ENABLE_INFERENCES`              | Enable background inference engine    | `false`         |
-| `INFERENCE_INTERVAL_SECS`        | Inference run interval                | `84600` (24h)   |
+| `INFERENCE_INTERVAL_SECS`        | Inference run interval                | `86400` (24h)   |
 | `INFERENCE_CONFIDENCE_THRESHOLD` | Min confidence for inferred memories  | `0.7`           |
 | `INFERENCE_MAX_PER_RUN`          | Max inferences per cycle              | `50`            |
 
@@ -313,4 +332,4 @@ Momo is designed to be functional even without external dependencies:
 
 ---
 
-For detailed API information, see [API Reference](./api.md).
+For detailed API information, see [API Reference](./api.md). For MCP integration, see [MCP Guide](./mcp.md).

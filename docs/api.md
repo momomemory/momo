@@ -13,6 +13,7 @@ Welcome to the Momo API reference. Momo is a self-hostable AI memory system that
 - [ID Formats](#id-formats)
 - [Enums](#enums)
 - [Health & System](#health--system)
+- [MCP (Streamable HTTP)](#mcp-streamable-http)
 - [Documents](#documents)
 - [Ingestions](#ingestions)
 - [Search](#search)
@@ -160,6 +161,19 @@ curl http://localhost:3000/api/v1/openapi.json
 `GET /api/v1/docs`
 
 Renders the ReDoc UI for API exploration.
+
+---
+
+## MCP (Streamable HTTP)
+
+Momo also exposes a built-in MCP server. This protocol surface is separate from the REST v1 envelope and uses JSON-RPC over streamable HTTP.
+
+- Endpoint: `POST /mcp` (or custom `MOMO_MCP_PATH`)
+- OAuth discovery:
+  - `GET /.well-known/oauth-protected-resource`
+  - `GET /.well-known/oauth-authorization-server`
+
+For protocol handshake, tool/resource catalog, and client examples, see [MCP Guide](./mcp.md).
 
 ---
 

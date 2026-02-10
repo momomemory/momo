@@ -11,7 +11,9 @@ The system handles document ingestion, memory extraction, and hybrid search with
 | Guide                                   | Description                                                         |
 | --------------------------------------- | ------------------------------------------------------------------- |
 | [API Reference](./api.md)               | REST API v1 reference, all endpoints, and request/response formats. |
+| [MCP Guide](./mcp.md)                   | Built-in MCP server setup, auth, tools/resources, and manual usage. |
 | [Self-Hosting Guide](./self-hosting.md) | Installation, configuration, and deployment instructions.           |
+| [Release Strategy](./release-strategy.md) | Versioning and release process for server and SDKs.               |
 
 ## Quick Links
 
@@ -26,6 +28,8 @@ Run Momo with Docker:
 ```bash
 docker run --name momo -d --restart unless-stopped -p 3000:3000 -v momo-data:/data ghcr.io/momomemory/momo:latest
 ```
+
+MCP is available at `http://localhost:3000/mcp`. See [MCP Guide](./mcp.md).
 
 Add a memory:
 

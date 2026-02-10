@@ -5,6 +5,7 @@ pub mod embeddings;
 pub mod error;
 pub mod intelligence;
 pub mod llm;
+pub mod mcp;
 pub mod models;
 pub mod ocr;
 pub mod processing;

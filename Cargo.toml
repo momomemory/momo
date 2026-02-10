@@ -24,6 +24,8 @@ axum = { version = "0.8", features = ["macros", "multipart"] }
 axum-extra = { version = "0.10", features = ["typed-header", "query"] }
 tower = "0.5"
 tower-http = { version = "0.6", features = ["cors", "trace", "limit"] }
+rmcp = { version = "0.8", features = ["server", "macros", "transport-streamable-http-server", "schemars"] }
+schemars = "1"
 
 # OpenAPI Documentation
 utoipa = { version = "5", features = ["axum_extras"] }

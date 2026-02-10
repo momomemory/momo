@@ -50,7 +50,7 @@ fn run_bun(frontend_dir: &Path, args: &[&str]) {
         .args(args)
         .current_dir(frontend_dir)
         .status()
-        .unwrap_or_else(|error| panic!("Failed to execute bun {:?}: {}", args, error));
+        .unwrap_or_else(|error| panic!("Failed to execute bun {args:?}: {error}"));
 
     assert!(
         status.success(),

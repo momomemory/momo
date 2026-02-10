@@ -155,7 +155,7 @@ impl LlmFilter {
 mod tests {
     use super::*;
     use crate::config::{
-        DatabaseConfig, EmbeddingsConfig, InferenceConfig, MemoryConfig, OcrConfig,
+        DatabaseConfig, EmbeddingsConfig, InferenceConfig, McpConfig, MemoryConfig, OcrConfig,
         ProcessingConfig, ServerConfig, TranscriptionConfig,
     };
 
@@ -166,6 +166,7 @@ mod tests {
                 port: 3000,
                 api_keys: vec![],
             },
+            mcp: McpConfig::default(),
             database: DatabaseConfig {
                 url: "file:test.db".to_string(),
                 auth_token: None,

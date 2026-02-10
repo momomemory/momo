@@ -8,7 +8,68 @@ interface CallOptions {
   auth?: boolean;
 }
 
-const API_BASE = '/api/v1';
+const API_BASE_STORAGE_KEY = 'momo.ui.apiBaseUrl';
+const DEFAULT_API_BASE = '/api/v1';
+
+function normalizeApiBase(input: string | null | undefined): string {
+  const trimmed = (input ?? '').trim();
+  if (!trimmed) {
+    return '';
+  }
+
+  return trimmed.replace(/\/+$/, '');
+}
+
+function loadStoredApiBase(): string {
+  if (typeof window === 'undefined') {
+    return '';
+  }
+
+  return normalizeApiBase(window.localStorage.getItem(API_BASE_STORAGE_KEY));
+}
+
+let apiBaseOverride = loadStoredApiBase();
+
+function resolveApiBase(): string {
+  const envBase = normalizeApiBase(import.meta.env.VITE_API_BASE_URL);
+  return apiBaseOverride || envBase || DEFAULT_API_BASE;
+}
+
+function buildApiUrl(path: string): string {
+  const base = resolveApiBase();
+  if (path.startsWith('http://') || path.startsWith('https://')) {
+    return path;
+  }
+
+  if (path.startsWith('/')) {
+    return `${base}${path}`;
+  }
+
+  return `${base}/${path}`;
+}
+
+export function getApiBaseOverride(): string {
+  return apiBaseOverride;
+}
+
+export function setApiBaseOverride(nextValue: string): void {
+  apiBaseOverride = normalizeApiBase(nextValue);
+
+  if (typeof window === 'undefined') {
+    return;
+  }
+
+  if (apiBaseOverride) {
+    window.localStorage.setItem(API_BASE_STORAGE_KEY, apiBaseOverride);
+    return;
+  }
+
+  window.localStorage.removeItem(API_BASE_STORAGE_KEY);
+}
+
+export function getEffectiveApiBase(): string {
+  return resolveApiBase();
+}
 
 function buildHeaders(body: FormData | unknown | undefined, apiKey: string | null, auth: boolean): Headers {
   const headers = new Headers();
@@ -61,7 +122,7 @@ export async function apiEnvelope<T>(
           ? options.body
           : JSON.stringify(options.body);
 
-    const response = await fetch(`${API_BASE}${path}`, {
+    const response = await fetch(buildApiUrl(path), {
       method,
       headers: buildHeaders(options.body, apiKey, auth),
       body,
@@ -136,7 +197,7 @@ export async function apiRaw<T>(
           ? options.body
           : JSON.stringify(options.body);
 
-    const response = await fetch(`${API_BASE}${path}`, {
+    const response = await fetch(buildApiUrl(path), {
       method,
       headers: buildHeaders(options.body, apiKey, auth),
       body,

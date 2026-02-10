@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useMemo, useState } from 'preact/hooks';
 
-import { apiEnvelope, apiRaw } from './api';
+import { apiEnvelope, apiRaw, getApiBaseOverride, getEffectiveApiBase, setApiBaseOverride } from './api';
 import { GraphCanvas } from './components/GraphCanvas';
 import { JsonView } from './components/JsonView';
 import type {
@@ -1502,18 +1502,21 @@ function AdminTab({ apiKey, onAuthFailure }: { apiKey: string; onAuthFailure: (m
 interface SettingsTabProps {
   apiKey: string;
   containerTag: string;
-  onSave: (nextApiKey: string, nextContainerTag: string) => Promise<void>;
+  apiBaseUrl: string;
+  onSave: (nextApiKey: string, nextContainerTag: string, nextApiBaseUrl: string) => Promise<void>;
   onValidate: () => Promise<void>;
 }
 
 function SettingsTab({
   apiKey,
   containerTag,
+  apiBaseUrl,
   onSave,
   onValidate,
 }: SettingsTabProps) {
   const [draftApiKey, setDraftApiKey] = useState(apiKey);
   const [draftContainerTag, setDraftContainerTag] = useState(containerTag);
+  const [draftApiBaseUrl, setDraftApiBaseUrl] = useState(apiBaseUrl);
   const [saving, setSaving] = useState(false);
 
   useEffect(() => {
@@ -1524,11 +1527,15 @@ function SettingsTab({
     setDraftContainerTag(containerTag);
   }, [containerTag]);
 
+  useEffect(() => {
+    setDraftApiBaseUrl(apiBaseUrl);
+  }, [apiBaseUrl]);
+
   const save = async (event: Event) => {
     event.preventDefault();
     setSaving(true);
     try {
-      await onSave(draftApiKey, draftContainerTag);
+      await onSave(draftApiKey, draftContainerTag, draftApiBaseUrl);
     } finally {
       setSaving(false);
     }
@@ -1555,6 +1562,14 @@ function SettingsTab({
             />
           </Field>
 
+          <Field label="API base URL (optional)">
+            <input
+              value={draftApiBaseUrl}
+              placeholder="e.g. /api/v1 or http://127.0.0.1:3199/api/v1"
+              onInput={(event) => setDraftApiBaseUrl((event.target as HTMLInputElement).value)}
+            />
+          </Field>
+
           <div class="button-row">
             <button type="submit" disabled={saving}>
               {saving ? 'Saving...' : 'Save settings'}
@@ -1572,7 +1587,7 @@ function SettingsTab({
         </form>
 
         <p class="muted">
-          API key and current container tag are stored in localStorage for this browser.
+          API key, current container tag, and API base URL override are stored in localStorage for this browser.
         </p>
       </Section>
     </div>
@@ -1588,8 +1603,11 @@ export function App() {
   });
   const [apiKey, setApiKey] = useState<string>(() => localStorage.getItem(API_KEY_STORAGE_KEY) ?? '');
   const [containerTag, setContainerTag] = useState<string>(() => localStorage.getItem(CONTAINER_STORAGE_KEY) ?? '');
+  const [apiBaseUrl, setApiBaseUrl] = useState<string>(() => getApiBaseOverride());
   const [containerTagOptions, setContainerTagOptions] = useState<string[]>([]);
   const [containerTagOptionsLoading, setContainerTagOptionsLoading] = useState(false);
+  const [containerTagOptionsError, setContainerTagOptionsError] = useState<string | null>(null);
+  const [scopeTagDropdownOpen, setScopeTagDropdownOpen] = useState(false);
   const [scopeExpanded, setScopeExpanded] = useState<boolean>(() => {
     if (typeof window === 'undefined') {
       return true;
@@ -1609,19 +1627,35 @@ export function App() {
   const [authState, setAuthState] = useState<AuthState>(() => (apiKey.trim() ? 'checking' : 'missing'));
   const [authMessage, setAuthMessage] = useState<string | null>(null);
   const [modalApiKey, setModalApiKey] = useState(apiKey);
+  const [modalApiBaseUrl, setModalApiBaseUrl] = useState(apiBaseUrl);
   const [modalSubmitting, setModalSubmitting] = useState(false);
+
+  const mergeContainerTagOptions = useCallback(
+    (tags: string[]) => {
+      const current = containerTag.trim();
+      const deduped = new Set<string>(tags);
+      if (current) {
+        deduped.add(current);
+      }
+      return [...deduped].sort((left, right) => left.localeCompare(right));
+    },
+    [containerTag],
+  );
 
   const refreshContainerTagOptions = useCallback(async () => {
     const trimmedApiKey = apiKey.trim();
     if (!trimmedApiKey) {
-      setContainerTagOptions([]);
+      setContainerTagOptions(mergeContainerTagOptions([]));
+      setContainerTagOptionsError(null);
       return;
     }
 
     setContainerTagOptionsLoading(true);
+    setContainerTagOptionsError(null);
     try {
       const response = await apiEnvelope<ContainerTagsResponse>(trimmedApiKey, '/containers/tags');
       if (!response.ok) {
+        setContainerTagOptionsError(response.error ?? 'Failed to load container tags');
         return;
       }
 
@@ -1630,11 +1664,11 @@ export function App() {
         .filter((tag) => tag.length > 0)
         .sort((left, right) => left.localeCompare(right));
 
-      setContainerTagOptions(tags);
+      setContainerTagOptions(mergeContainerTagOptions(tags));
     } finally {
       setContainerTagOptionsLoading(false);
     }
-  }, [apiKey]);
+  }, [apiKey, mergeContainerTagOptions]);
 
   const validateApiKey = useCallback(async (candidateKey: string): Promise<boolean> => {
     const trimmed = candidateKey.trim();
@@ -1662,10 +1696,14 @@ export function App() {
   }, []);
 
   const applyCredentials = useCallback(
-    async (nextApiKey: string, nextContainerTag?: string) => {
+    async (nextApiKey: string, nextContainerTag?: string, nextApiBaseUrl?: string) => {
       setApiKey(nextApiKey);
       if (nextContainerTag !== undefined) {
         setContainerTag(nextContainerTag);
+      }
+      if (nextApiBaseUrl !== undefined) {
+        setApiBaseUrl(nextApiBaseUrl);
+        setApiBaseOverride(nextApiBaseUrl);
       }
       return validateApiKey(nextApiKey);
     },
@@ -1675,6 +1713,10 @@ export function App() {
   useEffect(() => {
     setModalApiKey(apiKey);
   }, [apiKey]);
+
+  useEffect(() => {
+    setModalApiBaseUrl(apiBaseUrl);
+  }, [apiBaseUrl]);
 
   useEffect(() => {
     void validateApiKey(apiKey);
@@ -1690,6 +1732,10 @@ export function App() {
   }, [containerTag]);
 
   useEffect(() => {
+    setApiBaseOverride(apiBaseUrl);
+  }, [apiBaseUrl]);
+
+  useEffect(() => {
     localStorage.setItem(SCOPE_EXPANDED_STORAGE_KEY, scopeExpanded ? '1' : '0');
   }, [scopeExpanded]);
 
@@ -1697,7 +1743,21 @@ export function App() {
     if (authState === 'valid') {
       void refreshContainerTagOptions();
     }
-  }, [authState, refreshContainerTagOptions]);
+  }, [authState, apiBaseUrl, refreshContainerTagOptions]);
+
+  useEffect(() => {
+    const trimmed = containerTag.trim();
+    if (!trimmed) {
+      return;
+    }
+
+    setContainerTagOptions((current) => {
+      if (current.includes(trimmed)) {
+        return current;
+      }
+      return [...current, trimmed].sort((left, right) => left.localeCompare(right));
+    });
+  }, [containerTag]);
 
   useEffect(() => {
     if (typeof window === 'undefined') {
@@ -1741,6 +1801,14 @@ export function App() {
     }),
     [apiKey, containerTag, handleAuthFailure],
   );
+  const filteredContainerTagOptions = useMemo(() => {
+    const query = containerTag.trim().toLowerCase();
+    if (!query) {
+      return containerTagOptions;
+    }
+
+    return containerTagOptions.filter((tag) => tag.toLowerCase().includes(query));
+  }, [containerTag, containerTagOptions]);
 
   const authModalVisible = authState !== 'valid';
 
@@ -1748,7 +1816,7 @@ export function App() {
     event.preventDefault();
     setModalSubmitting(true);
     try {
-      const ok = await applyCredentials(modalApiKey);
+      const ok = await applyCredentials(modalApiKey, undefined, modalApiBaseUrl);
       if (ok && activeTab === 'settings') {
         setActiveTab('system');
       }
@@ -1812,17 +1880,47 @@ export function App() {
               <div class="scope-row">
                 <label class="scope-field">
                   <span>Container tag</span>
-                  <input
-                    list="global-container-tag-options"
-                    value={containerTag}
-                    onInput={(event) => setContainerTag((event.target as HTMLInputElement).value)}
-                    placeholder="user_123"
-                  />
-                  <datalist id="global-container-tag-options">
-                    {containerTagOptions.map((tag) => (
-                      <option key={tag} value={tag} />
-                    ))}
-                  </datalist>
+                  <div class="scope-combobox">
+                    <input
+                      value={containerTag}
+                      onFocus={() => {
+                        setScopeTagDropdownOpen(true);
+                        void refreshContainerTagOptions();
+                      }}
+                      onBlur={() => {
+                        window.setTimeout(() => setScopeTagDropdownOpen(false), 120);
+                      }}
+                      onInput={(event) => setContainerTag((event.target as HTMLInputElement).value)}
+                      placeholder="user_123"
+                    />
+                    {scopeTagDropdownOpen && (
+                      <div class="scope-dropdown" role="listbox" aria-label="Container tag options">
+                        {containerTagOptionsLoading && <p class="scope-dropdown-empty">Loading tags...</p>}
+                        {!containerTagOptionsLoading && containerTagOptionsError && (
+                          <p class="scope-dropdown-empty">{containerTagOptionsError}</p>
+                        )}
+                        {!containerTagOptionsLoading && !containerTagOptionsError && filteredContainerTagOptions.length === 0 && (
+                          <p class="scope-dropdown-empty">No matching container tags.</p>
+                        )}
+                        {filteredContainerTagOptions.map((tag) => (
+                          <button
+                            key={tag}
+                            type="button"
+                            class={tag === containerTag.trim() ? 'scope-dropdown-option active' : 'scope-dropdown-option'}
+                            onMouseDown={(event) => {
+                              event.preventDefault();
+                            }}
+                            onClick={() => {
+                              setContainerTag(tag);
+                              setScopeTagDropdownOpen(false);
+                            }}
+                          >
+                            {tag}
+                          </button>
+                        ))}
+                      </div>
+                    )}
+                  </div>
                 </label>
                 <div class="scope-row-actions">
                   <button
@@ -1857,14 +1955,18 @@ export function App() {
                 Expand to edit the current container tag.
               </p>
             )}
+            <p class="scope-note collapsed">
+              API base: <code>{getEffectiveApiBase()}</code>
+            </p>
           </header>
 
           {activeTab === 'settings' && (
             <SettingsTab
               apiKey={apiKey}
               containerTag={containerTag}
-              onSave={async (nextApiKey, nextContainerTag) => {
-                await applyCredentials(nextApiKey, nextContainerTag);
+              apiBaseUrl={apiBaseUrl}
+              onSave={async (nextApiKey, nextContainerTag, nextApiBaseUrl) => {
+                await applyCredentials(nextApiKey, nextContainerTag, nextApiBaseUrl);
               }}
               onValidate={async () => {
                 await validateApiKey(apiKey);
@@ -1901,6 +2003,14 @@ export function App() {
                 />
               </Field>
 
+              <Field label="API base URL (optional)">
+                <input
+                  value={modalApiBaseUrl}
+                  placeholder="e.g. /api/v1 or http://127.0.0.1:3199/api/v1"
+                  onInput={(event) => setModalApiBaseUrl((event.target as HTMLInputElement).value)}
+                />
+              </Field>
+
               <div class="button-row">
                 <button type="submit" disabled={modalSubmitting || authState === 'checking'}>
                   {modalSubmitting || authState === 'checking' ? 'Verifying...' : 'Save and verify'}
@@ -1910,7 +2020,7 @@ export function App() {
 
             {authMessage && <p class={authState === 'invalid' ? 'error' : 'notice'}>{authMessage}</p>}
             <p class="muted">
-              Credentials are stored in localStorage and can also be edited in the Settings tab.
+              Credentials and API base URL are stored in localStorage and can also be edited in the Settings tab.
             </p>
           </div>
         </div>
