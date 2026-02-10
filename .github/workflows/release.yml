@@ -224,6 +224,19 @@ jobs:
           username: ${{ github.actor }}
           password: ${{ secrets.GITHUB_TOKEN }}
 
+      - name: Download linux amd64 binary artifact
+        uses: actions/download-artifact@v4
+        with:
+          name: momo-linux-amd64.tar.gz
+          path: artifacts
+
+      - name: Prepare docker binary payload (amd64)
+        shell: bash
+        run: |
+          mkdir -p dist/linux-amd64
+          tar xzf artifacts/momo-linux-amd64.tar.gz -C dist/linux-amd64
+          chmod +x dist/linux-amd64/momo
+
       - name: Build and push Docker image (amd64)
         id: build-amd64
         uses: docker/build-push-action@v6
@@ -232,6 +245,8 @@ jobs:
           file: ./Dockerfile
           push: ${{ needs.meta.outputs.dry_run != 'true' }}
           tags: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:${{ needs.meta.outputs.version }}-amd64
+          build-args: |
+            BINARY_PATH=dist/linux-amd64/momo
           cache-from: type=gha
           cache-to: type=gha,mode=max
           platforms: linux/amd64
@@ -239,7 +254,7 @@ jobs:
   docker-arm64:
     name: Docker image (linux/arm64)
     needs: [meta, build-binary]
-    runs-on: blacksmith-4vcpu-ubuntu-2404-arm
+    runs-on: ubuntu-24.04-arm
     steps:
       - name: Checkout
         uses: actions/checkout@v4
@@ -255,6 +270,19 @@ jobs:
           username: ${{ github.actor }}
           password: ${{ secrets.GITHUB_TOKEN }}
 
+      - name: Download linux arm64 binary artifact
+        uses: actions/download-artifact@v4
+        with:
+          name: momo-linux-arm64.tar.gz
+          path: artifacts
+
+      - name: Prepare docker binary payload (arm64)
+        shell: bash
+        run: |
+          mkdir -p dist/linux-arm64
+          tar xzf artifacts/momo-linux-arm64.tar.gz -C dist/linux-arm64
+          chmod +x dist/linux-arm64/momo
+
       - name: Build and push Docker image (arm64)
         id: build-arm64
         uses: docker/build-push-action@v6
@@ -263,6 +291,8 @@ jobs:
           file: ./Dockerfile
           push: ${{ needs.meta.outputs.dry_run != 'true' }}
           tags: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:${{ needs.meta.outputs.version }}-arm64
+          build-args: |
+            BINARY_PATH=dist/linux-arm64/momo
           cache-from: type=gha
           cache-to: type=gha,mode=max
           platforms: linux/arm64
