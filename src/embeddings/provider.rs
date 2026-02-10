@@ -10,6 +10,7 @@ enum EmbeddingBackend {
         ingest_model: Arc<Mutex<TextEmbedding>>,
         batch_size: usize,
         ingest_batch_size: usize,
+        ingest_batch_pause_ms: u64,
     },
 }
 
@@ -40,6 +41,10 @@ impl EmbeddingProvider {
             .and_then(|raw| raw.parse::<usize>().ok())
             .filter(|size| *size > 0)
             .unwrap_or_else(|| config.batch_size.min(32).max(1));
+        let ingest_batch_pause_ms = std::env::var("EMBEDDING_INGEST_BATCH_PAUSE_MS")
+            .ok()
+            .and_then(|raw| raw.parse::<u64>().ok())
+            .unwrap_or(0);
 
         let dual_model = std::env::var("EMBEDDING_DUAL_MODEL")
             .ok()
@@ -59,6 +64,7 @@ impl EmbeddingProvider {
                 ingest_model,
                 batch_size: config.batch_size,
                 ingest_batch_size,
+                ingest_batch_pause_ms,
             },
             dimensions: config.dimensions,
         })
@@ -132,6 +138,7 @@ impl EmbeddingProvider {
         match &self.backend {
             EmbeddingBackend::Local {
                 ingest_batch_size,
+                ingest_batch_pause_ms,
                 ..
             } => {
                 if passages.is_empty() {
@@ -147,6 +154,10 @@ impl EmbeddingProvider {
                     let mut embedded = self.embed_with_mode(prefixed, EmbeddingMode::Ingest).await?;
                     all_embeddings.append(&mut embedded);
                     tokio::task::yield_now().await;
+                    if *ingest_batch_pause_ms > 0 {
+                        tokio::time::sleep(std::time::Duration::from_millis(*ingest_batch_pause_ms))
+                            .await;
+                    }
                 }
 
                 Ok(all_embeddings)
@@ -167,12 +178,14 @@ impl Clone for EmbeddingProvider {
                 ingest_model,
                 batch_size,
                 ingest_batch_size,
+                ingest_batch_pause_ms,
             } => Self {
                 backend: EmbeddingBackend::Local {
                     query_model: Arc::clone(query_model),
                     ingest_model: Arc::clone(ingest_model),
                     batch_size: *batch_size,
                     ingest_batch_size: *ingest_batch_size,
+                    ingest_batch_pause_ms: *ingest_batch_pause_ms,
                 },
                 dimensions: self.dimensions,
             },

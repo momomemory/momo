@@ -160,7 +160,16 @@ mod tests {
             crate::transcription::TranscriptionProvider::new(&config.transcription).unwrap();
         let llm = crate::llm::LlmProvider::new(config.llm.as_ref());
 
-        let state = AppState::new(config, db, embeddings, None, ocr, transcription, llm);
+        let state = AppState::new(
+            config,
+            db.clone(),
+            db,
+            embeddings,
+            None,
+            ocr,
+            transcription,
+            llm,
+        );
 
         async fn protected_handler() -> &'static str {
             "protected"

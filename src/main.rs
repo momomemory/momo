@@ -25,6 +25,10 @@ struct Args {
     /// Force rebuild embeddings when dimension mismatch detected
     #[arg(long)]
     rebuild_embeddings: bool,
+
+    /// Runtime mode: all, api, or worker
+    #[arg(long)]
+    mode: Option<String>,
 }
 
 use std::sync::Arc;
@@ -37,6 +41,112 @@ use crate::intelligence::InferenceEngine;
 use crate::llm::LlmProvider;
 use crate::ocr::OcrProvider;
 use crate::transcription::TranscriptionProvider;
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+enum RuntimeMode {
+    All,
+    Api,
+    Worker,
+}
+
+impl RuntimeMode {
+    fn parse(raw: Option<&str>) -> Self {
+        let value = raw
+            .map(std::string::ToString::to_string)
+            .or_else(|| std::env::var("MOMO_RUNTIME_MODE").ok())
+            .map(|v| v.trim().to_lowercase());
+
+        match value.as_deref() {
+            Some("api") => Self::Api,
+            Some("worker") => Self::Worker,
+            Some("all") | None => Self::All,
+            Some(other) => {
+                tracing::warn!(
+                    value = %other,
+                    "Invalid MOMO_RUNTIME_MODE/--mode; falling back to 'all'"
+                );
+                Self::All
+            }
+        }
+    }
+
+    fn runs_api(self) -> bool {
+        matches!(self, Self::All | Self::Api)
+    }
+
+    fn runs_worker(self) -> bool {
+        matches!(self, Self::All | Self::Worker)
+    }
+
+    fn as_str(self) -> &'static str {
+        match self {
+            Self::All => "all",
+            Self::Api => "api",
+            Self::Worker => "worker",
+        }
+    }
+}
+
+#[derive(Debug, Clone)]
+struct ReadReplicaSettings {
+    database: crate::config::DatabaseConfig,
+    sync_interval_secs: u64,
+}
+
+fn parse_env_u64(name: &str, default: u64) -> u64 {
+    match std::env::var(name) {
+        Ok(raw) => match raw.parse::<u64>() {
+            Ok(value) => value,
+            Err(error) => {
+                tracing::warn!(
+                    variable = name,
+                    value = %raw,
+                    error = %error,
+                    "Invalid numeric env value; using default"
+                );
+                default
+            }
+        },
+        Err(_) => default,
+    }
+}
+
+fn read_replica_settings(write_config: &crate::config::DatabaseConfig) -> Option<ReadReplicaSettings> {
+    let read_url = std::env::var("DATABASE_READ_URL").ok();
+    let read_auth_token = std::env::var("DATABASE_READ_AUTH_TOKEN").ok();
+    let read_local_path = std::env::var("DATABASE_READ_LOCAL_PATH").ok();
+    let sync_interval_secs = parse_env_u64("DATABASE_READ_SYNC_INTERVAL_SECS", 2).max(1);
+
+    build_read_replica_settings(
+        write_config,
+        read_url,
+        read_auth_token,
+        read_local_path,
+        sync_interval_secs,
+    )
+}
+
+fn build_read_replica_settings(
+    write_config: &crate::config::DatabaseConfig,
+    read_url: Option<String>,
+    read_auth_token: Option<String>,
+    read_local_path: Option<String>,
+    sync_interval_secs: u64,
+) -> Option<ReadReplicaSettings> {
+
+    if read_url.is_none() && read_auth_token.is_none() && read_local_path.is_none() {
+        return None;
+    }
+
+    Some(ReadReplicaSettings {
+        database: crate::config::DatabaseConfig {
+            url: read_url.unwrap_or_else(|| write_config.url.clone()),
+            auth_token: read_auth_token.or_else(|| write_config.auth_token.clone()),
+            local_path: read_local_path.or_else(|| write_config.local_path.clone()),
+        },
+        sync_interval_secs,
+    })
+}
 
 #[tokio::main]
 async fn main() -> anyhow::Result<()> {
@@ -53,6 +163,9 @@ async fn main() -> anyhow::Result<()> {
         .init();
 
     let config = Config::from_env();
+    let runtime_mode = RuntimeMode::parse(args.mode.as_deref());
+
+    tracing::info!(mode = runtime_mode.as_str(), "Runtime mode selected");
 
     if config.server.api_keys.is_empty() {
         tracing::warn!(
@@ -60,22 +173,36 @@ async fn main() -> anyhow::Result<()> {
         );
     }
 
-    tracing::info!("Initializing database...");
-    let raw_db = Database::new(&config.database).await?;
-    let db_backend = LibSqlBackend::new(raw_db);
-    // Wrap in Arc<dyn DatabaseBackend> immediately so we can clone it
-    let db: Arc<dyn DatabaseBackend> = Arc::new(db_backend);
+    tracing::info!("Initializing write database...");
+    let write_raw_db = Database::new(&config.database).await?;
+    let write_db_backend = LibSqlBackend::new(write_raw_db);
+    let write_db: Arc<dyn DatabaseBackend> = Arc::new(write_db_backend);
+
+    let (read_db, read_sync_interval_secs) =
+        if let Some(replica) = read_replica_settings(&config.database) {
+            tracing::info!(
+                url = %replica.database.url,
+                local_path = ?replica.database.local_path,
+                "Initializing dedicated read database"
+            );
+            let read_raw_db = Database::new(&replica.database).await?;
+            let read_backend: Arc<dyn DatabaseBackend> = Arc::new(LibSqlBackend::new(read_raw_db));
+            (read_backend, Some(replica.sync_interval_secs))
+        } else {
+            tracing::info!("Using primary database for reads and writes");
+            (write_db.clone(), None)
+        };
 
     tracing::info!("Loading embedding model: {}...", config.embeddings.model);
     let embeddings = EmbeddingProvider::new(&config.embeddings)?;
 
-    // Pass &*db to dereference Arc<dyn DatabaseBackend> into &dyn DatabaseBackend
-    match migration::check_dimension_compatibility(&*db, &embeddings, args.rebuild_embeddings)
+    // Pass &*write_db to dereference Arc<dyn DatabaseBackend> into &dyn DatabaseBackend
+    match migration::check_dimension_compatibility(&*write_db, &embeddings, args.rebuild_embeddings)
         .await?
     {
         migration::MigrationDecision::NotNeeded => {}
         migration::MigrationDecision::Approved => {
-            migration::trigger_reembedding(&*db, embeddings.dimensions()).await?;
+            migration::trigger_reembedding(&*write_db, embeddings.dimensions()).await?;
             tracing::info!("Migration started. Documents will be re-embedded in background.");
         }
         migration::MigrationDecision::Rejected => {
@@ -134,7 +261,8 @@ async fn main() -> anyhow::Result<()> {
 
     let state = AppState::new(
         config.clone(),
-        db,
+        write_db,
+        read_db,
         embeddings,
         reranker,
         ocr,
@@ -143,152 +271,183 @@ async fn main() -> anyhow::Result<()> {
     );
 
     let cancel_token = CancellationToken::new();
-
-    tracing::info!("Starting background processing...");
-    let pipeline = state.pipeline.clone();
-    let token = cancel_token.child_token();
-    tokio::spawn(async move {
-        loop {
-            tokio::select! {
-                _ = token.cancelled() => {
-                    tracing::info!("Background processing shutting down...");
-                    break;
-                }
-                _ = tokio::time::sleep(tokio::time::Duration::from_secs(10)) => {
-                    if let Err(e) = pipeline.process_pending().await {
-                        tracing::error!("Background processing error: {}", e);
-                    }
-                }
-            }
-        }
-    });
-
-    tracing::info!("Starting forgetting manager...");
-    let manager = services::ForgettingManager::new(
-        state.db.clone(),
-        state.config.memory.forgetting_check_interval_secs,
-    );
-    let token = cancel_token.child_token();
-    tokio::spawn(async move {
-        loop {
-            tokio::select! {
-                _ = token.cancelled() => {
-                    tracing::info!("Forgetting manager shutting down...");
-                    break;
-                }
-                _ = tokio::time::sleep(tokio::time::Duration::from_secs(manager.interval_secs())) => {
-                    if let Err(e) = manager.run_once().await {
-                        tracing::error!("Forgetting manager error: {}", e);
-                    }
-                }
-            }
-        }
-    });
-
-    tracing::info!(
-        "Starting episode decay manager... (threshold={}, grace_days={})",
-        state.config.memory.episode_decay_threshold,
-        state.config.memory.episode_forget_grace_days
-    );
-    let decay_manager = services::EpisodeDecayManager::new(
-        state.db.clone(),
-        state.config.memory.episode_decay_threshold,
-        state.config.memory.episode_forget_grace_days,
-        state.config.memory.episode_decay_days,
-        state.config.memory.episode_decay_factor,
-    );
-    let token = cancel_token.child_token();
-    tokio::spawn(async move {
-        loop {
-            tokio::select! {
-                _ = token.cancelled() => {
-                    tracing::info!("Episode decay manager shutting down...");
-                    break;
-                }
-                _ = tokio::time::sleep(tokio::time::Duration::from_secs(decay_manager.interval_secs())) => {
-                    if let Err(e) = decay_manager.run_once().await {
-                        tracing::error!("Episode decay manager error: {}", e);
-                    }
-                }
-            }
-        }
-    });
-
-    // Inference engine (opt-in)
-    if state.config.memory.inference.enabled {
-        tracing::info!(
-            "Starting inference engine... (interval={}s)",
-            state.config.memory.inference.interval_secs
-        );
-        let engine = InferenceEngine::new(
-            state.db.clone(),
-            state.llm.clone(),
-            state.embeddings.clone(),
-            state.config.memory.inference.clone(),
-        );
-
+    if runtime_mode.runs_worker() {
+        let processing_interval_secs = parse_env_u64("PROCESSING_POLL_INTERVAL_SECS", 10).max(1);
+        tracing::info!(interval_secs = processing_interval_secs, "Starting background processing");
+        let pipeline = state.pipeline.clone();
         let token = cancel_token.child_token();
         tokio::spawn(async move {
             loop {
                 tokio::select! {
                     _ = token.cancelled() => {
-                        tracing::info!("Inference engine shutting down...");
+                        tracing::info!("Background processing shutting down...");
                         break;
                     }
-                    _ = tokio::time::sleep(tokio::time::Duration::from_secs(engine.interval_secs())) => {
-                        if let Err(e) = engine.run_once().await {
-                            tracing::error!("Inference engine error: {}", e);
+                    _ = tokio::time::sleep(tokio::time::Duration::from_secs(processing_interval_secs)) => {
+                        if let Err(e) = pipeline.process_pending().await {
+                            tracing::error!("Background processing error: {}", e);
                         }
                     }
                 }
             }
         });
-    }
 
-    if state.llm.is_available() {
-        tracing::info!(
-            "Starting profile refresh manager... (interval={}s)",
-            state.config.memory.profile_refresh_interval_secs
-        );
-        let profile_refresh = services::ProfileRefreshManager::new(
+        tracing::info!("Starting forgetting manager...");
+        let manager = services::ForgettingManager::new(
             state.db.clone(),
-            state.llm.clone(),
-            state.config.memory.profile_refresh_interval_secs,
+            state.config.memory.forgetting_check_interval_secs,
         );
         let token = cancel_token.child_token();
         tokio::spawn(async move {
             loop {
                 tokio::select! {
                     _ = token.cancelled() => {
-                        tracing::info!("Profile refresh manager shutting down...");
+                        tracing::info!("Forgetting manager shutting down...");
                         break;
                     }
-                    _ = tokio::time::sleep(tokio::time::Duration::from_secs(profile_refresh.interval_secs())) => {
-                        if let Err(e) = profile_refresh.run_once().await {
-                            tracing::error!("Profile refresh error: {}", e);
+                    _ = tokio::time::sleep(tokio::time::Duration::from_secs(manager.interval_secs())) => {
+                        if let Err(e) = manager.run_once().await {
+                            tracing::error!("Forgetting manager error: {}", e);
                         }
                     }
                 }
             }
         });
+
+        tracing::info!(
+            "Starting episode decay manager... (threshold={}, grace_days={})",
+            state.config.memory.episode_decay_threshold,
+            state.config.memory.episode_forget_grace_days
+        );
+        let decay_manager = services::EpisodeDecayManager::new(
+            state.db.clone(),
+            state.config.memory.episode_decay_threshold,
+            state.config.memory.episode_forget_grace_days,
+            state.config.memory.episode_decay_days,
+            state.config.memory.episode_decay_factor,
+        );
+        let token = cancel_token.child_token();
+        tokio::spawn(async move {
+            loop {
+                tokio::select! {
+                    _ = token.cancelled() => {
+                        tracing::info!("Episode decay manager shutting down...");
+                        break;
+                    }
+                    _ = tokio::time::sleep(tokio::time::Duration::from_secs(decay_manager.interval_secs())) => {
+                        if let Err(e) = decay_manager.run_once().await {
+                            tracing::error!("Episode decay manager error: {}", e);
+                        }
+                    }
+                }
+            }
+        });
+
+        // Inference engine (opt-in)
+        if state.config.memory.inference.enabled {
+            tracing::info!(
+                "Starting inference engine... (interval={}s)",
+                state.config.memory.inference.interval_secs
+            );
+            let engine = InferenceEngine::new(
+                state.db.clone(),
+                state.llm.clone(),
+                state.embeddings.clone(),
+                state.config.memory.inference.clone(),
+            );
+
+            let token = cancel_token.child_token();
+            tokio::spawn(async move {
+                loop {
+                    tokio::select! {
+                        _ = token.cancelled() => {
+                            tracing::info!("Inference engine shutting down...");
+                            break;
+                        }
+                        _ = tokio::time::sleep(tokio::time::Duration::from_secs(engine.interval_secs())) => {
+                            if let Err(e) = engine.run_once().await {
+                                tracing::error!("Inference engine error: {}", e);
+                            }
+                        }
+                    }
+                }
+            });
+        }
+
+        if state.llm.is_available() {
+            tracing::info!(
+                "Starting profile refresh manager... (interval={}s)",
+                state.config.memory.profile_refresh_interval_secs
+            );
+            let profile_refresh = services::ProfileRefreshManager::new(
+                state.db.clone(),
+                state.llm.clone(),
+                state.config.memory.profile_refresh_interval_secs,
+            );
+            let token = cancel_token.child_token();
+            tokio::spawn(async move {
+                loop {
+                    tokio::select! {
+                        _ = token.cancelled() => {
+                            tracing::info!("Profile refresh manager shutting down...");
+                            break;
+                        }
+                        _ = tokio::time::sleep(tokio::time::Duration::from_secs(profile_refresh.interval_secs())) => {
+                            if let Err(e) = profile_refresh.run_once().await {
+                                tracing::error!("Profile refresh error: {}", e);
+                            }
+                        }
+                    }
+                }
+            });
+        }
+    } else {
+        tracing::info!("Worker tasks disabled in API-only mode");
     }
 
-    let app = create_router(state);
+    if runtime_mode.runs_api() {
+        if let Some(interval_secs) = read_sync_interval_secs {
+            tracing::info!(interval_secs, "Starting read-replica sync loop");
+            let read_db = state.read_db.clone();
+            let token = cancel_token.child_token();
+            tokio::spawn(async move {
+                loop {
+                    tokio::select! {
+                        _ = token.cancelled() => {
+                            tracing::info!("Read-replica sync loop shutting down...");
+                            break;
+                        }
+                        _ = tokio::time::sleep(tokio::time::Duration::from_secs(interval_secs)) => {
+                            if let Err(e) = read_db.sync().await {
+                                tracing::warn!(error = %e, "Read-replica sync failed");
+                            }
+                        }
+                    }
+                }
+            });
+        }
 
-    let addr = format!("{}:{}", config.server.host, config.server.port);
-    tracing::info!("Momo starting on http://{}", addr);
-    tracing::info!("  Health check: http://{}/api/v1/health", addr);
-    tracing::info!("  API docs:     http://{}/api/v1/docs", addr);
-    tracing::info!("  OpenAPI spec: http://{}/api/v1/openapi.json", addr);
-    if config.mcp.enabled {
-        tracing::info!("  MCP endpoint: http://{}{}", addr, config.mcp.path);
+        let app = create_router(state);
+
+        let addr = format!("{}:{}", config.server.host, config.server.port);
+        tracing::info!("Momo starting on http://{}", addr);
+        tracing::info!("  Health check: http://{}/api/v1/health", addr);
+        tracing::info!("  API docs:     http://{}/api/v1/docs", addr);
+        tracing::info!("  OpenAPI spec: http://{}/api/v1/openapi.json", addr);
+        if config.mcp.enabled {
+            tracing::info!("  MCP endpoint: http://{}{}", addr, config.mcp.path);
+        }
+
+        let listener = tokio::net::TcpListener::bind(&addr).await?;
+        axum::serve(listener, app)
+            .with_graceful_shutdown(shutdown_signal(cancel_token))
+            .await?;
+
+        return Ok(());
     }
 
-    let listener = tokio::net::TcpListener::bind(&addr).await?;
-    axum::serve(listener, app)
-        .with_graceful_shutdown(shutdown_signal(cancel_token))
-        .await?;
-
+    tracing::info!("Worker mode active; HTTP server disabled");
+    shutdown_signal(cancel_token).await;
     Ok(())
 }
 
@@ -317,4 +476,52 @@ async fn shutdown_signal(cancel_token: CancellationToken) {
 
     tracing::info!("Shutdown signal received, cancelling background tasks...");
     cancel_token.cancel();
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn runtime_mode_parse_values() {
+        assert_eq!(RuntimeMode::parse(Some("all")), RuntimeMode::All);
+        assert_eq!(RuntimeMode::parse(Some("api")), RuntimeMode::Api);
+        assert_eq!(RuntimeMode::parse(Some("worker")), RuntimeMode::Worker);
+        assert_eq!(RuntimeMode::parse(Some("unknown")), RuntimeMode::All);
+    }
+
+    #[test]
+    fn build_read_replica_settings_none_when_no_overrides() {
+        let write_cfg = crate::config::DatabaseConfig {
+            url: "file:momo.db".to_string(),
+            auth_token: None,
+            local_path: None,
+        };
+
+        let settings = build_read_replica_settings(&write_cfg, None, None, None, 2);
+        assert!(settings.is_none());
+    }
+
+    #[test]
+    fn build_read_replica_settings_uses_write_defaults() {
+        let write_cfg = crate::config::DatabaseConfig {
+            url: "libsql://primary.turso.io".to_string(),
+            auth_token: Some("primary-token".to_string()),
+            local_path: Some("primary-local.db".to_string()),
+        };
+
+        let settings = build_read_replica_settings(
+            &write_cfg,
+            Some("libsql://read.turso.io".to_string()),
+            None,
+            None,
+            5,
+        )
+        .expect("read replica should be configured");
+
+        assert_eq!(settings.database.url, "libsql://read.turso.io");
+        assert_eq!(settings.database.auth_token, Some("primary-token".to_string()));
+        assert_eq!(settings.database.local_path, Some("primary-local.db".to_string()));
+        assert_eq!(settings.sync_interval_secs, 5);
+    }
 }

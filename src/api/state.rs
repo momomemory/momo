@@ -13,7 +13,10 @@ use crate::transcription::TranscriptionProvider;
 #[derive(Clone)]
 pub struct AppState {
     pub config: Arc<Config>,
+    /// Primary read/write backend.
     pub db: Arc<dyn DatabaseBackend>,
+    /// Read-preferred backend (can point to replica).
+    pub read_db: Arc<dyn DatabaseBackend>,
     pub embeddings: EmbeddingProvider,
     pub reranker: Option<RerankerProvider>,
     pub llm: LlmProvider,
@@ -27,6 +30,7 @@ impl AppState {
     pub fn new(
         config: Config,
         db: Arc<dyn DatabaseBackend>,
+        read_db: Arc<dyn DatabaseBackend>,
         embeddings: EmbeddingProvider,
         reranker: Option<RerankerProvider>,
         ocr: OcrProvider,
@@ -35,6 +39,7 @@ impl AppState {
     ) -> Self {
         let config = Arc::new(config);
         let search = SearchService::new(
+            read_db.clone(),
             db.clone(),
             embeddings.clone(),
             reranker.clone(),
@@ -55,6 +60,7 @@ impl AppState {
         Self {
             config,
             db,
+            read_db,
             embeddings,
             reranker,
             llm,

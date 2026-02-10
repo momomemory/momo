@@ -81,7 +81,16 @@ mod tests {
             crate::transcription::TranscriptionProvider::new(&config.transcription).unwrap();
         let llm = crate::llm::LlmProvider::new(config.llm.as_ref());
 
-        AppState::new(config, db, embeddings, None, ocr, transcription, llm)
+        AppState::new(
+            config,
+            db.clone(),
+            db,
+            embeddings,
+            None,
+            ocr,
+            transcription,
+            llm,
+        )
     }
 
     async fn body_json(response: axum::response::Response) -> serde_json::Value {

@@ -91,6 +91,7 @@ async fn setup_test_app() -> (SocketAddr, TempDir, MockServer) {
 
     let state = momo::api::AppState::new(
         config.clone(),
+        db_backend.clone(),
         db_backend,
         embeddings,
         None,

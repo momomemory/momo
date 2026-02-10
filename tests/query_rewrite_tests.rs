@@ -54,6 +54,7 @@ async fn setup_test_app(llm_enabled: bool) -> (SocketAddr, TempDir) {
 
     let state = AppState::new(
         config.clone(),
+        db_backend.clone(),
         db_backend,
         embeddings,
         reranker,

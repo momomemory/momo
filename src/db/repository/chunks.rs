@@ -36,6 +36,13 @@ fn write_batch_size() -> usize {
         .unwrap_or(128)
 }
 
+fn write_batch_pause_ms() -> u64 {
+    std::env::var("DATABASE_WRITE_BATCH_PAUSE_MS")
+        .ok()
+        .and_then(|raw| raw.parse::<u64>().ok())
+        .unwrap_or(0)
+}
+
 impl ChunkRepository {
     pub async fn create(conn: &Connection, chunk: &Chunk) -> Result<()> {
         conn.execute(
@@ -65,12 +72,16 @@ impl ChunkRepository {
         }
 
         let batch_size = write_batch_size();
+        let batch_pause_ms = write_batch_pause_ms();
         for batch in chunks.chunks(batch_size) {
             let tx = conn.transaction().await?;
             for chunk in batch {
                 Self::create(&tx, chunk).await?;
             }
             tx.commit().await?;
+            if batch_pause_ms > 0 {
+                tokio::time::sleep(std::time::Duration::from_millis(batch_pause_ms)).await;
+            }
         }
 
         Ok(())
@@ -101,12 +112,16 @@ impl ChunkRepository {
         }
 
         let batch_size = write_batch_size();
+        let batch_pause_ms = write_batch_pause_ms();
         for batch in updates.chunks(batch_size) {
             let tx = conn.transaction().await?;
             for (chunk_id, embedding) in batch {
                 Self::update_embedding(&tx, chunk_id, embedding).await?;
             }
             tx.commit().await?;
+            if batch_pause_ms > 0 {
+                tokio::time::sleep(std::time::Duration::from_millis(batch_pause_ms)).await;
+            }
         }
 
         Ok(())

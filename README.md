@@ -11,6 +11,7 @@ Momo is a self-hostable AI memory system written in Rust — inspired by SuperMe
 - [Documentation](#documentation)
 - [SDKs](#sdks)
 - [Docker](#docker)
+- [Process Isolation](#process-isolation)
 - [Development](#development)
 - [Maintainers](#maintainers)
 - [Contributing](#contributing)
@@ -118,6 +119,42 @@ To follow logs:
 ```bash
 docker logs -f momo
 ```
+
+## Process Isolation
+
+Momo can run API and background ingestion/workers in separate processes.
+
+### Runtime Modes
+
+- `MOMO_RUNTIME_MODE=all` (default): API + background workers in one process
+- `MOMO_RUNTIME_MODE=api`: HTTP/API only (no background workers)
+- `MOMO_RUNTIME_MODE=worker`: Background workers only (no HTTP server)
+
+Example split deployment:
+
+```bash
+# API process
+MOMO_RUNTIME_MODE=api MOMO_PORT=3000 ./momo
+
+# Worker process
+MOMO_RUNTIME_MODE=worker ./momo
+```
+
+### Read/Write Split (LibSQL Replica Strategy)
+
+Use a dedicated read backend while keeping writes on the primary DB:
+
+```bash
+DATABASE_URL=libsql://primary.turso.io
+DATABASE_AUTH_TOKEN=primary-token
+
+DATABASE_READ_URL=libsql://read-replica.turso.io
+DATABASE_READ_AUTH_TOKEN=read-token
+DATABASE_READ_LOCAL_PATH=local-read-replica.db
+DATABASE_READ_SYNC_INTERVAL_SECS=2
+```
+
+Search reads use the read backend; writes continue through the primary backend.
 
 ## Development
 

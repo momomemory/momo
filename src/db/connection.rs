@@ -72,7 +72,7 @@ impl Database {
         let conn = self.connect()?;
 
         let busy_timeout_sql = format!("PRAGMA busy_timeout = {}", self.busy_timeout_ms);
-        if let Err(error) = conn.execute(&busy_timeout_sql, ()).await {
+        if let Err(error) = conn.execute_batch(&busy_timeout_sql).await {
             tracing::warn!(
                 busy_timeout_ms = self.busy_timeout_ms,
                 error = %error,
@@ -81,7 +81,7 @@ impl Database {
         }
 
         let journal_sql = format!("PRAGMA journal_mode = {}", self.journal_mode);
-        if let Err(error) = conn.execute(&journal_sql, ()).await {
+        if let Err(error) = conn.execute_batch(&journal_sql).await {
             tracing::warn!(
                 mode = %self.journal_mode,
                 error = %error,
@@ -90,7 +90,7 @@ impl Database {
         }
 
         let synchronous_sql = format!("PRAGMA synchronous = {}", self.synchronous);
-        if let Err(error) = conn.execute(&synchronous_sql, ()).await {
+        if let Err(error) = conn.execute_batch(&synchronous_sql).await {
             tracing::warn!(
                 mode = %self.synchronous,
                 error = %error,

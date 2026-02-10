@@ -17,7 +17,8 @@ use crate::search::QueryRewriteCache;
 
 #[derive(Clone)]
 pub struct SearchService {
-    db: Arc<dyn DatabaseBackend>,
+    read_db: Arc<dyn DatabaseBackend>,
+    write_db: Arc<dyn DatabaseBackend>,
     embeddings: EmbeddingProvider,
     reranker: Option<RerankerProvider>,
     llm: LlmProvider,
@@ -86,7 +87,8 @@ fn apply_memory_similarity(
 
 impl SearchService {
     pub fn new(
-        db: Arc<dyn DatabaseBackend>,
+        read_db: Arc<dyn DatabaseBackend>,
+        write_db: Arc<dyn DatabaseBackend>,
         embeddings: EmbeddingProvider,
         reranker: Option<RerankerProvider>,
         llm: LlmProvider,
@@ -103,7 +105,8 @@ impl SearchService {
         };
 
         Self {
-            db,
+            read_db,
+            write_db,
             embeddings,
             reranker,
             llm,
@@ -269,7 +272,7 @@ impl SearchService {
         let limit = req.limit.unwrap_or(10).min(100);
 
         let chunk_results = self
-            .db
+            .read_db
             .search_similar_chunks(
                 &query_embedding,
                 limit * 3,
@@ -289,7 +292,7 @@ impl SearchService {
         let mut results: Vec<DocumentSearchResult> = Vec::new();
 
         let doc_ids: Vec<String> = doc_chunks.keys().cloned().collect();
-        let docs = self.db.get_documents_by_ids(&doc_ids).await?;
+        let docs = self.read_db.get_documents_by_ids(&doc_ids).await?;
         let doc_map: HashMap<String, Document> =
             docs.into_iter().map(|d| (d.id.clone(), d)).collect();
 
@@ -510,7 +513,7 @@ impl SearchService {
             .unwrap_or(false);
 
         let memories = self
-            .db
+            .read_db
             .search_similar_memories(
                 &query_embedding,
                 limit,
@@ -537,7 +540,7 @@ impl SearchService {
         };
 
         let related_map: HashMap<String, Memory> = if !all_related_ids.is_empty() {
-            self.db
+            self.read_db
                 .get_memories_by_ids(&all_related_ids)
                 .await?
                 .into_iter()
@@ -554,12 +557,12 @@ impl SearchService {
 
             let context = if include_opts.related_memories.unwrap_or(false) {
                 let parents = if let Some(ref root_id) = memory.root_memory_id {
-                    self.db.get_memory_parents(root_id).await?
+                    self.read_db.get_memory_parents(root_id).await?
                 } else {
                     Vec::new()
                 };
 
-                let children = self.db.get_memory_children(&memory.id).await?;
+                let children = self.read_db.get_memory_children(&memory.id).await?;
 
                 let mut related = Vec::new();
                 for (related_id, relation_type) in &memory.memory_relations {
@@ -672,7 +675,7 @@ impl SearchService {
         let ids_vec: Vec<&str> = results.iter().map(|r| r.id.as_str()).collect();
 
         if !ids_vec.is_empty() {
-            match self.db.update_memory_last_accessed_batch(&ids_vec).await {
+            match self.write_db.update_memory_last_accessed_batch(&ids_vec).await {
                 Ok(updated_rows) => {
                     tracing::debug!(count = updated_rows, "Updated last_accessed for memories")
                 }
@@ -747,7 +750,7 @@ impl SearchService {
             let doc_limit = limit.saturating_mul(3);
 
             let chunk_results = self
-                .db
+                .read_db
                 .search_similar_chunks(
                     &query_embedding,
                     doc_limit,
@@ -768,7 +771,7 @@ impl SearchService {
             let mut chunk_ids_by_doc: HashMap<String, Vec<String>> = HashMap::new();
 
             let doc_ids: Vec<String> = doc_chunks.keys().cloned().collect();
-            let docs = self.db.get_documents_by_ids(&doc_ids).await?;
+            let docs = self.read_db.get_documents_by_ids(&doc_ids).await?;
             let doc_map: HashMap<String, Document> =
                 docs.into_iter().map(|d| (d.id.clone(), d)).collect();
 
@@ -871,7 +874,7 @@ impl SearchService {
             let memory_limit = limit.saturating_mul(3);
 
             let memories = self
-                .db
+                .read_db
                 .search_similar_memories(
                     &query_embedding,
                     memory_limit,
@@ -973,7 +976,7 @@ impl SearchService {
             let mut memory_doc_ids: HashSet<String> = HashSet::new();
 
             for memory in &memory_results {
-                match self.db.get_sources_by_memory(&memory.id).await {
+                match self.read_db.get_sources_by_memory(&memory.id).await {
                     Ok(sources) => {
                         for source in sources {
                             if !source.document_id.is_empty() {
@@ -1043,7 +1046,11 @@ impl SearchService {
         memory_ids.retain(|id| seen_ids.insert(*id));
 
         if !memory_ids.is_empty() {
-            match self.db.update_memory_last_accessed_batch(&memory_ids).await {
+            match self
+                .write_db
+                .update_memory_last_accessed_batch(&memory_ids)
+                .await
+            {
                 Ok(updated_rows) => tracing::debug!(
                     count = updated_rows,
                     "Updated last_accessed for hybrid memories"
@@ -1492,6 +1499,7 @@ mod tests {
             .unwrap();
 
         let service = SearchService::new(
+            db.clone(),
             db,
             embeddings,
             None,
@@ -1539,6 +1547,7 @@ mod tests {
         insert_memory_real(&conn, "mem1", Some("space"), Utc::now(), &embeddings).await;
 
         let service = SearchService::new(
+            db.clone(),
             db,
             embeddings,
             None,
@@ -1566,6 +1575,53 @@ mod tests {
     }
 
     #[tokio::test]
+    async fn test_search_documents_reads_from_read_backend() {
+        let (read_db, read_conn, _read_temp_dir) = setup_hybrid_db().await;
+        let (write_db, _write_conn, _write_temp_dir) = setup_hybrid_db().await;
+        let (embeddings, _mock_server) = test_embeddings_provider().await;
+
+        insert_document_with_chunks_real(
+            &read_conn,
+            "doc_read_backend",
+            &["read backend chunk"],
+            &embeddings,
+        )
+        .await;
+
+        let service = SearchService::new(
+            read_db,
+            write_db,
+            embeddings,
+            None,
+            LlmProvider::unavailable("tests"),
+            &Config::from_env(),
+        );
+
+        let response = service
+            .search_documents(SearchDocumentsRequest {
+                q: "read backend chunk".to_string(),
+                container_tags: None,
+                chunk_threshold: Some(0.0),
+                document_threshold: None,
+                doc_id: None,
+                filters: None,
+                include_full_docs: Some(false),
+                include_summary: Some(false),
+                limit: Some(5),
+                only_matching_chunks: Some(false),
+                rerank: Some(false),
+                rerank_level: None,
+                rerank_top_k: None,
+                rewrite_query: Some(false),
+            })
+            .await
+            .unwrap();
+
+        assert!(!response.results.is_empty());
+        assert_eq!(response.results[0].document_id, "doc_read_backend");
+    }
+
+    #[tokio::test]
     async fn test_search_hybrid_deduplicates_document_chunks_when_memory_sources_exist() {
         let (db, conn, _temp_dir) = setup_hybrid_db().await;
         let (embeddings, _mock_server) = test_embeddings_provider().await;
@@ -1577,6 +1633,7 @@ mod tests {
             .await
             .unwrap();
         let service = SearchService::new(
+            db.clone(),
             db,
             embeddings,
             None,
@@ -1612,6 +1669,7 @@ mod tests {
         insert_memory_real(&conn, "mem1", Some("space"), Utc::now(), &embeddings).await;
         insert_memory_real(&conn, "mem2", Some("space"), Utc::now(), &embeddings).await;
         let service = SearchService::new(
+            db.clone(),
             db,
             embeddings,
             None,
@@ -1658,6 +1716,7 @@ mod tests {
         ]);
 
         let service = SearchService::new(
+            db.clone(),
             db,
             embeddings,
             Some(reranker),
@@ -1697,6 +1756,7 @@ mod tests {
             .unwrap();
 
         let service = SearchService::new(
+            db.clone(),
             db,
             embeddings,
             None,
