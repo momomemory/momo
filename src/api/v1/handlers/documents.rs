@@ -20,6 +20,14 @@ use crate::api::AppState;
 use crate::models::{Document, DocumentType, ProcessingStatus};
 use crate::processing::ContentExtractor;
 
+fn parse_form_bool(value: &str) -> Option<bool> {
+    match value.trim().to_lowercase().as_str() {
+        "true" | "1" | "yes" | "on" => Some(true),
+        "false" | "0" | "no" | "off" => Some(false),
+        _ => None,
+    }
+}
+
 /// `POST /api/v1/documents`
 ///
 /// Creates a new document and queues it for async ingestion.
@@ -81,6 +89,26 @@ pub async fn create_document(
                 || ct == "bmp" =>
             {
                 DocumentType::Image
+            }
+            ct if ct.starts_with("audio/")
+                || ct == "audio"
+                || ct == "mp3"
+                || ct == "wav"
+                || ct == "m4a"
+                || ct == "ogg"
+                || ct == "flac" =>
+            {
+                DocumentType::Audio
+            }
+            ct if ct.starts_with("video/")
+                || ct == "video"
+                || ct == "mp4"
+                || ct == "webm"
+                || ct == "avi"
+                || ct == "mkv"
+                || ct == "mov" =>
+            {
+                DocumentType::Video
             }
             _ => DocumentType::Text,
         }
@@ -274,14 +302,24 @@ pub async fn upload_document(
     mut multipart: Multipart,
 ) -> ApiResponse<CreateDocumentResponse> {
     let mut file_bytes: Option<Vec<u8>> = None;
+    let mut file_name: Option<String> = None;
+    let mut file_content_type: Option<String> = None;
     let mut container_tag: Option<String> = None;
     let mut metadata: Option<std::collections::HashMap<String, serde_json::Value>> = None;
+    let mut extract_memories: Option<bool> = None;
 
     while let Ok(Some(field)) = multipart.next_field().await {
         let name = field.name().unwrap_or("").to_string();
 
         match name.as_str() {
             "file" => {
+                if let Some(name) = field.file_name() {
+                    file_name = Some(name.to_string());
+                }
+                if let Some(content_type) = field.content_type() {
+                    file_content_type = Some(content_type.to_string());
+                }
+
                 let bytes = match field.bytes().await {
                     Ok(b) => b,
                     Err(e) => {
@@ -328,6 +366,26 @@ pub async fn upload_document(
                 };
                 metadata = serde_json::from_str(&json_str).ok();
             }
+            "extractMemories" | "extract_memories" => {
+                let raw = match field.text().await {
+                    Ok(t) => t,
+                    Err(e) => {
+                        return ApiResponse::error(
+                            ErrorCode::InvalidRequest,
+                            format!("Invalid extractMemories value: {e}"),
+                        );
+                    }
+                };
+                match parse_form_bool(&raw) {
+                    Some(value) => extract_memories = Some(value),
+                    None => {
+                        return ApiResponse::error(
+                            ErrorCode::InvalidRequest,
+                            "extractMemories must be one of true/false/1/0/yes/no",
+                        );
+                    }
+                }
+            }
             _ => {}
         }
     }
@@ -339,7 +397,11 @@ pub async fn upload_document(
         }
     };
 
-    let doc_type = ContentExtractor::detect_type_from_bytes(&bytes);
+    let doc_type = ContentExtractor::detect_type_from_upload(
+        &bytes,
+        file_name.as_deref(),
+        file_content_type.as_deref(),
+    );
     if matches!(doc_type, DocumentType::Unknown) {
         return ApiResponse::error(ErrorCode::InvalidRequest, "Unsupported file type");
     }
@@ -361,7 +423,10 @@ pub async fn upload_document(
     let content_b64 = base64::engine::general_purpose::STANDARD.encode(&bytes);
 
     let mut doc_metadata = metadata.unwrap_or_default();
-    doc_metadata.insert("extract_memories".to_string(), serde_json::json!(false));
+    doc_metadata.insert(
+        "extract_memories".to_string(),
+        serde_json::json!(extract_memories.unwrap_or(false)),
+    );
 
     let doc = Document {
         id: id.clone(),
@@ -616,6 +681,24 @@ pub async fn get_ingestion_status(
 mod tests {
     use super::*;
     use crate::api::v1::dto::common::IngestionStatus;
+
+    #[test]
+    fn parse_form_bool_accepts_supported_values() {
+        assert_eq!(parse_form_bool("true"), Some(true));
+        assert_eq!(parse_form_bool("1"), Some(true));
+        assert_eq!(parse_form_bool("yes"), Some(true));
+        assert_eq!(parse_form_bool("on"), Some(true));
+        assert_eq!(parse_form_bool("false"), Some(false));
+        assert_eq!(parse_form_bool("0"), Some(false));
+        assert_eq!(parse_form_bool("no"), Some(false));
+        assert_eq!(parse_form_bool("off"), Some(false));
+    }
+
+    #[test]
+    fn parse_form_bool_rejects_unknown_values() {
+        assert_eq!(parse_form_bool("maybe"), None);
+        assert_eq!(parse_form_bool(""), None);
+    }
 
     #[test]
     fn create_document_response_serializes_correctly() {

@@ -329,13 +329,22 @@ curl -X POST http://localhost:3000/api/v1/documents:batch \
 
 `POST /api/v1/documents:upload`
 
+Multipart form fields:
+- `file` (required): Binary file payload.
+- `containerTag` (optional): Namespace/container tag.
+- `metadata` (optional): JSON object string.
+- `extractMemories` (optional): `true|false` (also accepts `1|0|yes|no`). Defaults to `false`.
+
+Supported media and documents include PDF, Office files (`docx`, `pptx`, `xlsx`), images (OCR), and audio/video (transcription) when providers are configured.
+
 **Example Request:**
 
 ```bash
 curl -X POST http://localhost:3000/api/v1/documents:upload \
   -H "Authorization: Bearer <token>" \
   -F "file=@/path/to/document.pdf" \
-  -F "containerTag=user_123"
+  -F "containerTag=user_123" \
+  -F "extractMemories=true"
 ```
 
 ---

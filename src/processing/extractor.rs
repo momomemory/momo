@@ -16,6 +16,25 @@ pub enum ImageFormat {
     Bmp,
 }
 
+/// Audio format detected from magic bytes
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum AudioFormat {
+    Mp3,
+    Wav,
+    Flac,
+    Ogg,
+    M4a,
+}
+
+/// Video format detected from magic bytes
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum VideoFormat {
+    Mp4,
+    Webm,
+    Avi,
+    Mkv,
+}
+
 /// Detect image format from magic bytes
 pub fn detect_image_format(bytes: &[u8]) -> Option<ImageFormat> {
     // JPEG: FF D8 FF
@@ -45,6 +64,79 @@ pub fn detect_image_format(bytes: &[u8]) -> Option<ImageFormat> {
     if bytes.len() >= 2 && bytes[0..2] == [0x42, 0x4D] {
         return Some(ImageFormat::Bmp);
     }
+    None
+}
+
+/// Detect audio format from magic bytes
+pub fn detect_audio_format(bytes: &[u8]) -> Option<AudioFormat> {
+    // MP3 frame sync: FF FB / FF F3 / FF F2
+    if bytes.len() >= 2
+        && bytes[0] == 0xFF
+        && (bytes[1] == 0xFB || bytes[1] == 0xF3 || bytes[1] == 0xF2)
+    {
+        return Some(AudioFormat::Mp3);
+    }
+
+    // MP3 ID3 tag: "ID3"
+    if bytes.len() >= 3 && bytes[0..3] == [0x49, 0x44, 0x33] {
+        return Some(AudioFormat::Mp3);
+    }
+
+    // WAV: RIFF....WAVE
+    if bytes.len() >= 12
+        && bytes[0..4] == [0x52, 0x49, 0x46, 0x46]
+        && bytes[8..12] == [0x57, 0x41, 0x56, 0x45]
+    {
+        return Some(AudioFormat::Wav);
+    }
+
+    // FLAC: fLaC
+    if bytes.len() >= 4 && bytes[0..4] == [0x66, 0x4C, 0x61, 0x43] {
+        return Some(AudioFormat::Flac);
+    }
+
+    // OGG: OggS
+    if bytes.len() >= 4 && bytes[0..4] == [0x4F, 0x67, 0x67, 0x53] {
+        return Some(AudioFormat::Ogg);
+    }
+
+    // M4A container: ftyp with audio-specific brands
+    if bytes.len() >= 12 && bytes[4..8] == [0x66, 0x74, 0x79, 0x70] {
+        let brand = &bytes[8..12];
+        if brand == b"M4A " || brand == b"M4B " {
+            return Some(AudioFormat::M4a);
+        }
+    }
+
+    None
+}
+
+/// Detect video format from magic bytes
+pub fn detect_video_format(bytes: &[u8]) -> Option<VideoFormat> {
+    // MP4/WebM/etc. often have ISO BMFF ftyp box at offset 4
+    if bytes.len() >= 12 && bytes[4..8] == [0x66, 0x74, 0x79, 0x70] {
+        let brand = &bytes[8..12];
+        if brand == b"isom" || brand == b"iso2" || brand == b"mp41" || brand == b"mp42" {
+            return Some(VideoFormat::Mp4);
+        }
+    }
+
+    // AVI: RIFF....AVI 
+    if bytes.len() >= 12
+        && bytes[0..4] == [0x52, 0x49, 0x46, 0x46]
+        && bytes[8..12] == [0x41, 0x56, 0x49, 0x20]
+    {
+        return Some(VideoFormat::Avi);
+    }
+
+    // WebM/Matroska: 1A 45 DF A3
+    if bytes.len() >= 4 && bytes[0..4] == [0x1A, 0x45, 0xDF, 0xA3] {
+        if bytes.windows(4).any(|w| w == b"webm") {
+            return Some(VideoFormat::Webm);
+        }
+        return Some(VideoFormat::Mkv);
+    }
+
     None
 }
 
@@ -422,6 +514,8 @@ impl ContentExtractor {
             DocumentType::Image
         } else if content_type.contains("video/") {
             DocumentType::Video
+        } else if content_type.contains("audio/") {
+            DocumentType::Audio
         } else if content_type
             .contains("application/vnd.openxmlformats-officedocument.wordprocessingml.document")
             || url.ends_with(".docx")
@@ -452,6 +546,14 @@ impl ContentExtractor {
     pub fn detect_type_from_bytes(bytes: &[u8]) -> DocumentType {
         if detect_image_format(bytes).is_some() {
             return DocumentType::Image;
+        }
+
+        if detect_audio_format(bytes).is_some() {
+            return DocumentType::Audio;
+        }
+
+        if detect_video_format(bytes).is_some() {
+            return DocumentType::Video;
         }
 
         if bytes.starts_with(&[0x25, 0x50, 0x44, 0x46]) {
@@ -505,6 +607,52 @@ impl ContentExtractor {
 
             // Valid UTF-8 text
             return DocumentType::Text;
+        }
+
+        DocumentType::Unknown
+    }
+
+    pub fn detect_type_from_upload(
+        bytes: &[u8],
+        file_name: Option<&str>,
+        content_type: Option<&str>,
+    ) -> DocumentType {
+        let by_bytes = Self::detect_type_from_bytes(bytes);
+        if !matches!(by_bytes, DocumentType::Unknown) {
+            return by_bytes;
+        }
+
+        if let Some(ct) = content_type {
+            let ct_lower = ct.to_lowercase();
+            if ct_lower.starts_with("image/") {
+                return DocumentType::Image;
+            }
+            if ct_lower.starts_with("audio/") {
+                return DocumentType::Audio;
+            }
+            if ct_lower.starts_with("video/") {
+                return DocumentType::Video;
+            }
+        }
+
+        if let Some(name) = file_name {
+            let lower = name.to_lowercase();
+            if lower.ends_with(".mp3")
+                || lower.ends_with(".wav")
+                || lower.ends_with(".m4a")
+                || lower.ends_with(".ogg")
+                || lower.ends_with(".flac")
+            {
+                return DocumentType::Audio;
+            }
+            if lower.ends_with(".mp4")
+                || lower.ends_with(".webm")
+                || lower.ends_with(".avi")
+                || lower.ends_with(".mkv")
+                || lower.ends_with(".mov")
+            {
+                return DocumentType::Video;
+            }
         }
 
         DocumentType::Unknown
@@ -632,6 +780,59 @@ mod tests {
         assert_eq!(
             ContentExtractor::detect_type_from_bytes(&pdf_bytes),
             DocumentType::Pdf
+        );
+    }
+
+    #[test]
+    fn test_detect_audio_types_from_bytes() {
+        let wav_bytes = [
+            0x52, 0x49, 0x46, 0x46, 0x24, 0x00, 0x00, 0x00, 0x57, 0x41, 0x56, 0x45,
+        ];
+        assert_eq!(
+            ContentExtractor::detect_type_from_bytes(&wav_bytes),
+            DocumentType::Audio
+        );
+
+        let mp3_id3 = [0x49, 0x44, 0x33, 0x04, 0x00, 0x00];
+        assert_eq!(
+            ContentExtractor::detect_type_from_bytes(&mp3_id3),
+            DocumentType::Audio
+        );
+    }
+
+    #[test]
+    fn test_detect_video_types_from_bytes() {
+        let mp4_bytes = [
+            0x00, 0x00, 0x00, 0x20, 0x66, 0x74, 0x79, 0x70, 0x69, 0x73, 0x6F, 0x6D,
+        ];
+        assert_eq!(
+            ContentExtractor::detect_type_from_bytes(&mp4_bytes),
+            DocumentType::Video
+        );
+
+        let mkv_bytes = [0x1A, 0x45, 0xDF, 0xA3, 0x00, 0x00, 0x00, 0x00];
+        assert_eq!(
+            ContentExtractor::detect_type_from_bytes(&mkv_bytes),
+            DocumentType::Video
+        );
+    }
+
+    #[test]
+    fn test_detect_type_from_upload_fallbacks() {
+        let unknown = [0x00, 0x01, 0x02, 0x03];
+
+        assert_eq!(
+            ContentExtractor::detect_type_from_upload(&unknown, Some("voice-note.mp3"), None),
+            DocumentType::Audio
+        );
+
+        assert_eq!(
+            ContentExtractor::detect_type_from_upload(
+                &unknown,
+                Some("clip.bin"),
+                Some("video/webm")
+            ),
+            DocumentType::Video
         );
     }
 
