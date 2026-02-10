@@ -166,7 +166,7 @@ jobs:
       - name: Cache cargo artifacts
         uses: swatinem/rust-cache@v2
         with:
-          key: release-${{ matrix.target }}
+          key: release-${{ matrix.target }}-${{ matrix.runner }}
 
       - name: Build release binary (Apple Silicon)
         if: matrix.target == 'aarch64-apple-darwin'
