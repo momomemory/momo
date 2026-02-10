@@ -115,6 +115,14 @@ impl From<models::GraphResponse> for GraphResponse {
     }
 }
 
+/// Distinct active container tags.
+#[derive(Debug, Clone, Serialize, utoipa::ToSchema)]
+#[serde(rename_all = "camelCase")]
+pub struct ContainerTagsResponse {
+    /// Distinct container tags that have active memories.
+    pub tags: Vec<String>,
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;

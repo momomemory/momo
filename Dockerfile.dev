@@ -1,10 +1,20 @@
-FROM ubuntu:22.04
+FROM rust:bookworm AS builder
+
+WORKDIR /app
+RUN apt-get update && \
+    apt-get install -y --no-install-recommends pkg-config cmake clang libclang-dev libleptonica-dev libtesseract-dev && \
+    rm -rf /var/lib/apt/lists/*
+ENV SOURCE_DATE_EPOCH=1
+COPY . .
+RUN cargo build
+
+FROM debian:bookworm-slim
 
 ENV DEBIAN_FRONTEND=noninteractive
 ENV ONNXRUNTIME_VERSION=1.23.2
 
 RUN apt-get update && \
-    apt-get install -y --no-install-recommends ca-certificates curl libtesseract4 tesseract-ocr tesseract-ocr-eng && \
+    apt-get install -y --no-install-recommends ca-certificates curl libtesseract5 tesseract-ocr tesseract-ocr-eng && \
     rm -rf /var/lib/apt/lists/*
 
 ARG TARGETARCH
@@ -22,20 +32,13 @@ RUN set -eux; \
     ldconfig; \
     rm -rf /tmp/onnxruntime.tgz /tmp/onnxruntime-linux-${ORT_ARCH}-${ONNXRUNTIME_VERSION}
 
-ARG BINARY_PATH=target/release/momo
-COPY ${BINARY_PATH} /usr/local/bin/momo
+COPY --from=builder /app/target/debug/momo /usr/local/bin/momo
 RUN chmod +x /usr/local/bin/momo
 
 RUN set -e; \
     ldd_output="$(ldd /usr/local/bin/momo 2>&1 || true)"; \
     printf '%s\n' "$ldd_output"; \
-    if printf '%s\n' "$ldd_output" | grep -q "not a dynamic executable"; then \
-      if ! /usr/local/bin/momo --version >/dev/null 2>&1; then \
-        echo "Binary at /usr/local/bin/momo is not runnable on this Linux image. Build for linux target/arch before docker build."; \
-        exit 1; \
-      fi; \
-      echo "Static binary detected. Skipping shared-library check."; \
-    elif printf '%s\n' "$ldd_output" | grep -q "not found"; then \
+    if printf '%s\n' "$ldd_output" | grep -q "not found"; then \
       echo "Missing shared libraries for /usr/local/bin/momo"; \
       exit 1; \
     fi

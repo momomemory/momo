@@ -32,6 +32,7 @@ use super::response;
         handlers::memories::forget_memory,
         handlers::graph::get_memory_graph,
         handlers::graph::get_container_graph,
+        handlers::graph::list_container_tags,
         handlers::admin::run_forgetting,
         handlers::profile::compute_profile,
         handlers::conversation::ingest_conversation,
@@ -92,6 +93,7 @@ use super::response;
         dto::graph::GraphNodeResponse,
         dto::graph::GraphEdgeResponse,
         dto::graph::GraphResponse,
+        dto::graph::ContainerTagsResponse,
         // Admin
         dto::admin::ForgettingRunResponse,
         // Health (handler-local types)

@@ -1,0 +1,20 @@
+services:
+  momo:
+    build:
+      context: .
+      dockerfile: Dockerfile.dev
+    container_name: momo-dev
+    restart: unless-stopped
+    ports:
+      - "${MOMO_PORT:-3000}:3000"
+    env_file:
+      - .env
+    environment:
+      MOMO_HOST: "${MOMO_HOST:-0.0.0.0}"
+      MOMO_PORT: "${MOMO_PORT:-3000}"
+      DATABASE_URL: "${MOMO_DATABASE_URL:-file:/data/momo.db}"
+    volumes:
+      - momo-data:/data
+
+volumes:
+  momo-data:

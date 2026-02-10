@@ -7,7 +7,7 @@ use axum::extract::{Path, Query, State};
 use serde::Deserialize;
 use serde_json::json;
 
-use crate::api::v1::dto::GraphResponse;
+use crate::api::v1::dto::{ContainerTagsResponse, GraphResponse};
 use crate::api::v1::response::{ApiError, ApiResponse, ErrorCode};
 use crate::api::AppState;
 use crate::models::{
@@ -177,6 +177,32 @@ pub async fn get_container_graph(
 
     let domain_response = graph_data_to_response(graph_data);
     ApiResponse::success(domain_response.into())
+}
+
+/// `GET /api/v1/containers/tags`
+///
+/// Returns distinct active container tags.
+#[utoipa::path(
+    get,
+    path = "/api/v1/containers/tags",
+    tag = "graph",
+    operation_id = "graph.listContainerTags",
+    responses(
+        (status = 200, description = "Container tags", body = ContainerTagsResponse),
+    )
+)]
+pub async fn list_container_tags(
+    State(state): State<AppState>,
+) -> ApiResponse<ContainerTagsResponse> {
+    let mut tags = match state.db.get_active_container_tags().await {
+        Ok(tags) => tags,
+        Err(e) => return e.into(),
+    };
+
+    tags.sort();
+    tags.dedup();
+
+    ApiResponse::success(ContainerTagsResponse { tags })
 }
 
 #[cfg(test)]

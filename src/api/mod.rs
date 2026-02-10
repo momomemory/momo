@@ -1,4 +1,5 @@
 mod extractors;
+mod frontend;
 mod routes;
 mod state;
 pub mod v1;

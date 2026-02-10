@@ -40,7 +40,9 @@ pub fn v1_router(state: AppState) -> Router<AppState> {
         )
         .route("/{memoryId}/graph", get(handlers::graph::get_memory_graph));
     let search = Router::new().route("/", post(handlers::search::search));
-    let containers = Router::new().route("/{tag}/graph", get(handlers::graph::get_container_graph));
+    let containers = Router::new()
+        .route("/tags", get(handlers::graph::list_container_tags))
+        .route("/{tag}/graph", get(handlers::graph::get_container_graph));
     let public_routes = Router::new()
         .route("/health", get(handlers::health_check))
         .route("/openapi.json", get(super::openapi::openapi_json))

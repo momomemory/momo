@@ -25,6 +25,11 @@ The fastest way to get Momo running is via Docker:
 docker run --name momo -d --restart unless-stopped -p 3000:3000 -v momo-data:/data ghcr.io/momomemory/momo:latest
 ```
 
+Then open:
+
+- Web console: `http://localhost:3000/`
+- API docs: `http://localhost:3000/api/v1/docs`
+
 ### Add a Memory
 ```bash
 curl -X POST http://localhost:3000/api/v1/conversations:ingest \
@@ -42,6 +47,7 @@ curl -X POST http://localhost:3000/api/v1/search \
 ## Features
 
 - **Vector Search**: Native LibSQL vector embeddings (no external vector DB needed)
+- **Embedded Web Console**: Bun + Preact UI embedded in the binary and served from `/`
 - **Local AI Pipeline**: Built-in support for local embeddings (FastEmbed) and transcription (Whisper)
 - **External Embeddings**: Support for OpenAI, OpenRouter, Ollama, and LM Studio APIs
 - **Universal Ingestion**: Extract from URLs, PDFs, HTML, DOCX, Images (OCR), and Audio/Video
@@ -89,8 +95,14 @@ docker logs -f momo
 ## Development
 
 ```bash
-# Run in development mode
-cargo run
+# From monorepo root: run backend + frontend with auto-reload
+just dev
+
+# Build frontend bundle (embedded in binary)
+just build-frontend
+
+# Build server (includes frontend bundle)
+just build
 
 # Run tests
 cargo test
@@ -101,6 +113,8 @@ cargo clippy
 # Format code
 cargo fmt
 ```
+
+Note: when frontend assets are missing, Rust build uses `momo/build.rs` to run `bun install` and `bun run build`.
 
 ## Maintainers
 

@@ -1,7 +1,9 @@
+use axum::routing::get;
 use axum::Router;
 use tower_http::cors::{Any, CorsLayer};
 use tower_http::trace::TraceLayer;
 
+use super::frontend;
 use super::v1;
 use super::AppState;
 
@@ -16,6 +18,8 @@ pub fn create_router(state: AppState) -> Router {
 
     Router::new()
         .nest("/api/v1", v1)
+        .route("/", get(frontend::serve_root))
+        .route("/{*path}", get(frontend::serve_path))
         .layer(cors)
         .layer(TraceLayer::new_for_http())
         .with_state(state)
