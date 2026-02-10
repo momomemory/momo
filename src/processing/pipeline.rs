@@ -255,6 +255,7 @@ impl ProcessingPipeline {
 
         let mut updated_doc = doc.clone();
         updated_doc.title = extracted.title.or(doc.title);
+        updated_doc.content = Some(extracted.text.clone());
         updated_doc.doc_type = match (&doc.doc_type, &extracted.doc_type) {
             // Don't downgrade specific types to generic Text/Unknown
             (DocumentType::Code, DocumentType::Text | DocumentType::Unknown) => {
