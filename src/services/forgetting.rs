@@ -124,6 +124,9 @@ mod tests {
 
         let db = Database {
             db: Arc::new(inner_db),
+            busy_timeout_ms: 5000,
+            journal_mode: "WAL".to_string(),
+            synchronous: "NORMAL".to_string(),
         };
         let backend: Arc<dyn DatabaseBackend> = Arc::new(LibSqlBackend::new(db));
 

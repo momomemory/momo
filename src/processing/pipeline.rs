@@ -511,12 +511,37 @@ impl ProcessingPipeline {
         let pending = self.db.get_processing_documents().await?;
 
         for doc in pending {
-            if let Err(e) = self.process_document(&doc.id).await {
-                tracing::error!("Failed to process document {}: {}", doc.id, e);
+            let mut attempts = 0;
+            loop {
+                match self.process_document(&doc.id).await {
+                    Ok(()) => break,
+                    Err(e) if is_database_locked_error(&e) && attempts < 3 => {
+                        attempts += 1;
+                        let delay_ms = 100 * attempts as u64;
+                        tracing::warn!(
+                            doc_id = %doc.id,
+                            attempts,
+                            delay_ms,
+                            "Database locked while processing; retrying"
+                        );
+                        tokio::time::sleep(std::time::Duration::from_millis(delay_ms)).await;
+                    }
+                    Err(e) => {
+                        tracing::error!("Failed to process document {}: {}", doc.id, e);
+                        break;
+                    }
+                }
             }
         }
 
         Ok(())
+    }
+}
+
+fn is_database_locked_error(error: &crate::error::MomoError) -> bool {
+    match error {
+        crate::error::MomoError::Database(db_err) => db_err.to_string().contains("database is locked"),
+        _ => false,
     }
 }
 

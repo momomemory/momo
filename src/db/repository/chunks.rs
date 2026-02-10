@@ -28,6 +28,14 @@ fn build_tag_filter(
 
 pub struct ChunkRepository;
 
+fn write_batch_size() -> usize {
+    std::env::var("DATABASE_WRITE_BATCH_SIZE")
+        .ok()
+        .and_then(|raw| raw.parse::<usize>().ok())
+        .filter(|size| *size > 0)
+        .unwrap_or(128)
+}
+
 impl ChunkRepository {
     pub async fn create(conn: &Connection, chunk: &Chunk) -> Result<()> {
         conn.execute(
@@ -52,9 +60,19 @@ impl ChunkRepository {
     }
 
     pub async fn create_batch(conn: &Connection, chunks: &[Chunk]) -> Result<()> {
-        for chunk in chunks {
-            Self::create(conn, chunk).await?;
+        if chunks.is_empty() {
+            return Ok(());
         }
+
+        let batch_size = write_batch_size();
+        for batch in chunks.chunks(batch_size) {
+            let tx = conn.transaction().await?;
+            for chunk in batch {
+                Self::create(&tx, chunk).await?;
+            }
+            tx.commit().await?;
+        }
+
         Ok(())
     }
 
@@ -78,9 +96,19 @@ impl ChunkRepository {
         conn: &Connection,
         updates: &[(String, Vec<f32>)],
     ) -> Result<()> {
-        for (chunk_id, embedding) in updates {
-            Self::update_embedding(conn, chunk_id, embedding).await?;
+        if updates.is_empty() {
+            return Ok(());
         }
+
+        let batch_size = write_batch_size();
+        for batch in updates.chunks(batch_size) {
+            let tx = conn.transaction().await?;
+            for (chunk_id, embedding) in batch {
+                Self::update_embedding(&tx, chunk_id, embedding).await?;
+            }
+            tx.commit().await?;
+        }
+
         Ok(())
     }
 

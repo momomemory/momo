@@ -61,26 +61,33 @@ async fn search_documents(
     req: &SearchRequest,
     start: Instant,
 ) -> ApiResponse<SearchResponse> {
-    let internal_req = SearchDocumentsRequest {
-        q: req.q.clone(),
-        container_tags: req.container_tags.clone(),
-        chunk_threshold: req.threshold,
-        document_threshold: None,
-        doc_id: None,
-        filters: None,
-        include_full_docs: Some(req.include.documents),
-        include_summary: Some(req.include.documents),
-        limit: req.limit,
-        only_matching_chunks: Some(!req.include.chunks),
-        rerank: req.rerank,
-        rerank_level: None,
-        rerank_top_k: None,
-        rewrite_query: None,
-    };
+    let mut attempts = 0;
+    let response = loop {
+        let internal_req = SearchDocumentsRequest {
+            q: req.q.clone(),
+            container_tags: req.container_tags.clone(),
+            chunk_threshold: req.threshold,
+            document_threshold: None,
+            doc_id: None,
+            filters: None,
+            include_full_docs: Some(req.include.documents),
+            include_summary: Some(req.include.documents),
+            limit: req.limit,
+            only_matching_chunks: Some(!req.include.chunks),
+            rerank: req.rerank,
+            rerank_level: None,
+            rerank_top_k: None,
+            rewrite_query: None,
+        };
 
-    let response = match state.search.search_documents(internal_req).await {
-        Ok(resp) => resp,
-        Err(e) => return ApiResponse::from(e),
+        match state.search.search_documents(internal_req).await {
+            Ok(resp) => break resp,
+            Err(e) if is_database_locked_error(&e) && attempts < 3 => {
+                attempts += 1;
+                tokio::time::sleep(std::time::Duration::from_millis(60 * attempts as u64)).await;
+            }
+            Err(e) => return ApiResponse::from(e),
+        }
     };
 
     let results: Vec<SearchResultItem> = response
@@ -111,20 +118,27 @@ async fn search_memories(
         .as_ref()
         .and_then(|tags| tags.first().cloned());
 
-    let internal_req = SearchMemoriesRequest {
-        q: req.q.clone(),
-        container_tag,
-        threshold: req.threshold,
-        filters: None,
-        include: None,
-        limit: req.limit,
-        rerank: req.rerank,
-        rewrite_query: None,
-    };
+    let mut attempts = 0;
+    let response = loop {
+        let internal_req = SearchMemoriesRequest {
+            q: req.q.clone(),
+            container_tag: container_tag.clone(),
+            threshold: req.threshold,
+            filters: None,
+            include: None,
+            limit: req.limit,
+            rerank: req.rerank,
+            rewrite_query: None,
+        };
 
-    let response = match state.search.search_memories(internal_req).await {
-        Ok(resp) => resp,
-        Err(e) => return ApiResponse::from(e),
+        match state.search.search_memories(internal_req).await {
+            Ok(resp) => break resp,
+            Err(e) if is_database_locked_error(&e) && attempts < 3 => {
+                attempts += 1;
+                tokio::time::sleep(std::time::Duration::from_millis(60 * attempts as u64)).await;
+            }
+            Err(e) => return ApiResponse::from(e),
+        }
     };
 
     let results: Vec<SearchResultItem> = response
@@ -157,21 +171,28 @@ async fn search_hybrid(
         .as_ref()
         .and_then(|tags| tags.first().cloned());
 
-    let internal_req = HybridSearchRequest {
-        q: req.q.clone(),
-        container_tag,
-        threshold: req.threshold,
-        filters: None,
-        include: None,
-        limit: req.limit,
-        rerank: req.rerank,
-        rewrite_query: None,
-        search_mode: SearchMode::Hybrid,
-    };
+    let mut attempts = 0;
+    let response = loop {
+        let internal_req = HybridSearchRequest {
+            q: req.q.clone(),
+            container_tag: container_tag.clone(),
+            threshold: req.threshold,
+            filters: None,
+            include: None,
+            limit: req.limit,
+            rerank: req.rerank,
+            rewrite_query: None,
+            search_mode: SearchMode::Hybrid,
+        };
 
-    let response = match state.search.search_hybrid(internal_req).await {
-        Ok(resp) => resp,
-        Err(e) => return ApiResponse::from(e),
+        match state.search.search_hybrid(internal_req).await {
+            Ok(resp) => break resp,
+            Err(e) if is_database_locked_error(&e) && attempts < 3 => {
+                attempts += 1;
+                tokio::time::sleep(std::time::Duration::from_millis(60 * attempts as u64)).await;
+            }
+            Err(e) => return ApiResponse::from(e),
+        }
     };
 
     // Hybrid results are either memory-backed or chunk-backed.
@@ -193,15 +214,16 @@ async fn search_hybrid(
                     updated_at: v1_result.updated_at,
                 })
             } else {
+                let chunk_content = v1_result.chunk.clone();
                 SearchResultItem::Document(V1DocumentSearchResult {
                     document_id: v1_result.document_id.unwrap_or_default(),
                     title: None,
                     doc_type: None,
                     score: v1_result.similarity,
                     rerank_score: v1_result.rerank_score,
-                    chunks: if v1_result.chunk.is_some() {
+                    chunks: if chunk_content.is_some() {
                         vec![crate::api::v1::dto::ChunkResult {
-                            content: v1_result.chunk.unwrap_or_default(),
+                            content: chunk_content.clone().unwrap_or_default(),
                             score: v1_result.similarity,
                             rerank_score: v1_result.rerank_score,
                         }]
@@ -209,7 +231,7 @@ async fn search_hybrid(
                         vec![]
                     },
                     summary: None,
-                    content: None,
+                    content: chunk_content,
                     metadata: v1_result.metadata,
                     created_at: v1_result.updated_at,
                     updated_at: v1_result.updated_at,
@@ -226,6 +248,13 @@ async fn search_hybrid(
         total,
         timing_ms,
     })
+}
+
+fn is_database_locked_error(error: &crate::error::MomoError) -> bool {
+    match error {
+        crate::error::MomoError::Database(db_err) => db_err.to_string().contains("database is locked"),
+        _ => false,
+    }
 }
 
 #[cfg(test)]

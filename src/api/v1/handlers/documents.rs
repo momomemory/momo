@@ -659,21 +659,33 @@ pub async fn get_ingestion_status(
     State(state): State<AppState>,
     Path(ingestion_id): Path<String>,
 ) -> ApiResponse<IngestionStatusResponse> {
-    match state.db.get_document_by_id(&ingestion_id).await {
-        Ok(Some(doc)) => {
-            let resp = IngestionStatusResponse {
-                document_id: doc.id,
-                status: doc.status.into(),
-                title: doc.title,
-                created_at: doc.created_at,
-            };
-            ApiResponse::success(resp)
+    let mut attempts = 0;
+    loop {
+        match state.db.get_document_by_id(&ingestion_id).await {
+            Ok(Some(doc)) => {
+                let resp = IngestionStatusResponse {
+                    document_id: doc.id,
+                    status: doc.status.into(),
+                    title: doc.title,
+                    created_at: doc.created_at,
+                };
+                return ApiResponse::success(resp);
+            }
+            Ok(None) => {
+                return ApiResponse::error(
+                    ErrorCode::NotFound,
+                    format!("Ingestion {ingestion_id} not found"),
+                );
+            }
+            Err(crate::error::MomoError::Database(db_err))
+                if db_err.to_string().contains("database is locked") && attempts < 3 =>
+            {
+                attempts += 1;
+                tokio::time::sleep(std::time::Duration::from_millis(75 * attempts as u64)).await;
+                continue;
+            }
+            Err(e) => return e.into(),
         }
-        Ok(None) => ApiResponse::error(
-            ErrorCode::NotFound,
-            format!("Ingestion {ingestion_id} not found"),
-        ),
-        Err(e) => e.into(),
     }
 }
 
