@@ -40,7 +40,7 @@ impl EmbeddingProvider {
             .ok()
             .and_then(|raw| raw.parse::<usize>().ok())
             .filter(|size| *size > 0)
-            .unwrap_or_else(|| config.batch_size.min(32).max(1));
+            .unwrap_or_else(|| config.batch_size.clamp(1, 32));
         let ingest_batch_pause_ms = std::env::var("EMBEDDING_INGEST_BATCH_PAUSE_MS")
             .ok()
             .and_then(|raw| raw.parse::<u64>().ok())
