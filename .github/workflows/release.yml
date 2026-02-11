@@ -129,9 +129,6 @@ jobs:
           - target: aarch64-unknown-linux-gnu
             runner: ubuntu-22.04-arm
             archive: momo-linux-arm64.tar.gz
-          - target: x86_64-apple-darwin
-            runner: macos-15-intel
-            archive: momo-darwin-amd64.tar.gz
           - target: aarch64-apple-darwin
             runner: macos-15
             archive: momo-darwin-arm64.tar.gz

@@ -7,7 +7,7 @@
 | Artifact            | Registry                  | Format                     |
 | ------------------- | ------------------------- | -------------------------- |
 | Linux x86_64 binary | GitHub Releases           | `momo-linux-amd64.tar.gz`  |
-| macOS x86_64 binary | GitHub Releases           | `momo-darwin-amd64.tar.gz` |
+| Linux ARM64 binary  | GitHub Releases           | `momo-linux-arm64.tar.gz`  |
 | macOS ARM64 binary  | GitHub Releases           | `momo-darwin-arm64.tar.gz` |
 | Docker image        | `ghcr.io/momomemory/momo` | OCI (linux/amd64)          |
 | SHA256 checksums    | GitHub Releases           | `checksums.sha256`         |
@@ -145,7 +145,6 @@ These are explicitly **not** in the initial workflow but are easy to add later:
 | ----------------------------------------- | ------ | ----------------------------------- |
 | `release-please` for automated changelogs | Low    | When commit volume justifies it     |
 | `cargo-release` for version bumps         | Low    | When manual bumps become tedious    |
-| Linux ARM64 binary                        | Medium | When there's user demand            |
 | Windows binary                            | Medium | When there's user demand            |
 | Crates.io publish                         | Low    | If/when the crate becomes a library |
 | Cosign/Sigstore signing                   | Low    | When supply-chain security matters  |
