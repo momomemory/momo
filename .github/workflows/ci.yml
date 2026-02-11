@@ -43,6 +43,11 @@ jobs:
         with:
           components: rustfmt, clippy
 
+      - name: Setup Bun
+        uses: oven-sh/setup-bun@v2
+        with:
+          bun-version: latest
+
       - name: Check formatting
         run: |
           cargo fmt --all -- --check
