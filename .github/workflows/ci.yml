@@ -18,6 +18,8 @@ jobs:
   build:
     name: Build / Lint / Test (momo)
     runs-on: ubuntu-latest
+    env:
+      ONNXRUNTIME_VERSION: 1.23.2
     steps:
       - name: Checkout
         uses: actions/checkout@v4
@@ -60,8 +62,27 @@ jobs:
         run: |
           cargo clippy --workspace --all-features -- -D warnings
 
+      - name: Install ONNX Runtime shared library
+        run: |
+          set -eux
+          ARCH="$(uname -m)"
+          case "$ARCH" in
+            x86_64) ORT_ARCH="x64" ;;
+            aarch64) ORT_ARCH="aarch64" ;;
+            *) echo "Unsupported architecture: $ARCH"; exit 1 ;;
+          esac
+
+          curl -fsSL "https://github.com/microsoft/onnxruntime/releases/download/v${ONNXRUNTIME_VERSION}/onnxruntime-linux-${ORT_ARCH}-${ONNXRUNTIME_VERSION}.tgz" -o /tmp/onnxruntime.tgz
+          tar -xzf /tmp/onnxruntime.tgz -C /tmp
+          sudo cp "/tmp/onnxruntime-linux-${ORT_ARCH}-${ONNXRUNTIME_VERSION}/lib/libonnxruntime.so.${ONNXRUNTIME_VERSION}" /usr/local/lib/
+          sudo ln -sf "/usr/local/lib/libonnxruntime.so.${ONNXRUNTIME_VERSION}" /usr/local/lib/libonnxruntime.so.1
+          sudo ln -sf /usr/local/lib/libonnxruntime.so.1 /usr/local/lib/libonnxruntime.so
+          sudo ldconfig
+          rm -rf /tmp/onnxruntime.tgz "/tmp/onnxruntime-linux-${ORT_ARCH}-${ONNXRUNTIME_VERSION}"
+
       - name: Run tests
         env:
+          ORT_DYLIB_PATH: /usr/local/lib/libonnxruntime.so.1
           EMBEDDING_MODEL: openai/text-embedding-3-small
           EMBEDDING_API_KEY: ci-test-key
           EMBEDDING_DUAL_MODEL: "false"
