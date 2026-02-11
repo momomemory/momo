@@ -102,8 +102,34 @@ impl Database {
     }
 
     async fn init_schema(&self) -> Result<()> {
-        let conn = self.connect()?;
-        schema::init_schema(&conn).await?;
+        let retry_attempts = std::env::var("DATABASE_INIT_RETRY_ATTEMPTS")
+            .ok()
+            .and_then(|raw| raw.parse::<u32>().ok())
+            .unwrap_or(8);
+        let retry_delay_ms = std::env::var("DATABASE_INIT_RETRY_DELAY_MS")
+            .ok()
+            .and_then(|raw| raw.parse::<u64>().ok())
+            .unwrap_or(100);
+
+        for attempt in 0..=retry_attempts {
+            let conn = self.connect()?;
+            match schema::init_schema(&conn).await {
+                Ok(()) => return Ok(()),
+                Err(crate::error::MomoError::Database(db_err))
+                    if db_err.to_string().contains("database is locked") && attempt < retry_attempts =>
+                {
+                    let delay = retry_delay_ms.saturating_mul((attempt + 1) as u64);
+                    tracing::warn!(
+                        attempt = attempt + 1,
+                        delay_ms = delay,
+                        "Schema initialization hit locked database; retrying"
+                    );
+                    tokio::time::sleep(std::time::Duration::from_millis(delay)).await;
+                }
+                Err(error) => return Err(error),
+            }
+        }
+
         Ok(())
     }
 

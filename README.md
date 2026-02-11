@@ -126,9 +126,17 @@ Momo can run API and background ingestion/workers in separate processes.
 
 ### Runtime Modes
 
-- `MOMO_RUNTIME_MODE=all` (default): API + background workers in one process
+- `MOMO_RUNTIME_MODE=all` (default): supervisor mode; launches API and worker subprocesses
 - `MOMO_RUNTIME_MODE=api`: HTTP/API only (no background workers)
 - `MOMO_RUNTIME_MODE=worker`: Background workers only (no HTTP server)
+
+To force legacy single-process behavior when `MOMO_RUNTIME_MODE=all`:
+
+```bash
+./momo --single-process
+# or
+MOMO_SINGLE_PROCESS=true ./momo
+```
 
 Example split deployment:
 
