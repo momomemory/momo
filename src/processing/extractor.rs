@@ -618,7 +618,7 @@ impl ContentExtractor {
         content_type: Option<&str>,
     ) -> DocumentType {
         let by_bytes = Self::detect_type_from_bytes(bytes);
-        if !matches!(by_bytes, DocumentType::Unknown) {
+        if !matches!(by_bytes, DocumentType::Unknown | DocumentType::Text) {
             return by_bytes;
         }
 
@@ -655,7 +655,7 @@ impl ContentExtractor {
             }
         }
 
-        DocumentType::Unknown
+        by_bytes
     }
 
     fn looks_like_csv(bytes: &[u8]) -> bool {

@@ -61,6 +61,10 @@ jobs:
           cargo clippy --workspace --all-features -- -D warnings
 
       - name: Run tests
+        env:
+          EMBEDDING_MODEL: openai/text-embedding-3-small
+          EMBEDDING_API_KEY: ci-test-key
+          EMBEDDING_DUAL_MODEL: "false"
         run: |
           # compile & run tests for the momo crate workspace
           cargo test --workspace --all-features --no-fail-fast
