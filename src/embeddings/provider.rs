@@ -74,7 +74,11 @@ impl EmbeddingProvider {
         self.embed_with_mode(texts, EmbeddingMode::Query).await
     }
 
-    async fn embed_with_mode(&self, texts: Vec<String>, mode: EmbeddingMode) -> Result<Vec<Vec<f32>>> {
+    async fn embed_with_mode(
+        &self,
+        texts: Vec<String>,
+        mode: EmbeddingMode,
+    ) -> Result<Vec<Vec<f32>>> {
         if texts.is_empty() {
             return Ok(Vec::new());
         }
@@ -93,9 +97,9 @@ impl EmbeddingProvider {
                 let model = Arc::clone(selected);
                 let batch_size = *batch_size;
                 tokio::task::spawn_blocking(move || {
-                    let mut model = model
-                        .lock()
-                        .map_err(|e| MomoError::Embedding(format!("Embedding model lock poisoned: {e}")))?;
+                    let mut model = model.lock().map_err(|e| {
+                        MomoError::Embedding(format!("Embedding model lock poisoned: {e}"))
+                    })?;
                     model
                         .embed(texts, Some(batch_size))
                         .map_err(|e| MomoError::Embedding(e.to_string()))
@@ -147,16 +151,18 @@ impl EmbeddingProvider {
 
                 let mut all_embeddings = Vec::with_capacity(passages.len());
                 for batch in passages.chunks(*ingest_batch_size) {
-                    let prefixed: Vec<String> = batch
-                        .iter()
-                        .map(|p| format!("passage: {p}"))
-                        .collect();
-                    let mut embedded = self.embed_with_mode(prefixed, EmbeddingMode::Ingest).await?;
+                    let prefixed: Vec<String> =
+                        batch.iter().map(|p| format!("passage: {p}")).collect();
+                    let mut embedded = self
+                        .embed_with_mode(prefixed, EmbeddingMode::Ingest)
+                        .await?;
                     all_embeddings.append(&mut embedded);
                     tokio::task::yield_now().await;
                     if *ingest_batch_pause_ms > 0 {
-                        tokio::time::sleep(std::time::Duration::from_millis(*ingest_batch_pause_ms))
-                            .await;
+                        tokio::time::sleep(std::time::Duration::from_millis(
+                            *ingest_batch_pause_ms,
+                        ))
+                        .await;
                     }
                 }
 

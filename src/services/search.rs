@@ -675,7 +675,11 @@ impl SearchService {
         let ids_vec: Vec<&str> = results.iter().map(|r| r.id.as_str()).collect();
 
         if !ids_vec.is_empty() {
-            match self.write_db.update_memory_last_accessed_batch(&ids_vec).await {
+            match self
+                .write_db
+                .update_memory_last_accessed_batch(&ids_vec)
+                .await
+            {
                 Ok(updated_rows) => {
                     tracing::debug!(count = updated_rows, "Updated last_accessed for memories")
                 }

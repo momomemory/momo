@@ -116,7 +116,8 @@ impl Database {
             match schema::init_schema(&conn).await {
                 Ok(()) => return Ok(()),
                 Err(crate::error::MomoError::Database(db_err))
-                    if db_err.to_string().contains("database is locked") && attempt < retry_attempts =>
+                    if db_err.to_string().contains("database is locked")
+                        && attempt < retry_attempts =>
                 {
                     let delay = retry_delay_ms.saturating_mul((attempt + 1) as u64);
                     tracing::warn!(

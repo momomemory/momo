@@ -138,7 +138,9 @@ fn should_supervise_subprocesses(runtime_mode: RuntimeMode, single_process: bool
     matches!(runtime_mode, RuntimeMode::All) && !single_process
 }
 
-fn read_replica_settings(write_config: &crate::config::DatabaseConfig) -> Option<ReadReplicaSettings> {
+fn read_replica_settings(
+    write_config: &crate::config::DatabaseConfig,
+) -> Option<ReadReplicaSettings> {
     let read_url = std::env::var("DATABASE_READ_URL").ok();
     let read_auth_token = std::env::var("DATABASE_READ_AUTH_TOKEN").ok();
     let read_local_path = std::env::var("DATABASE_READ_LOCAL_PATH").ok();
@@ -160,7 +162,6 @@ fn build_read_replica_settings(
     read_local_path: Option<String>,
     sync_interval_secs: u64,
 ) -> Option<ReadReplicaSettings> {
-
     if read_url.is_none() && read_auth_token.is_none() && read_local_path.is_none() {
         return None;
     }
@@ -175,7 +176,11 @@ fn build_read_replica_settings(
     })
 }
 
-fn build_child_command(executable: &std::path::Path, mode: RuntimeMode, args: &Args) -> tokio::process::Command {
+fn build_child_command(
+    executable: &std::path::Path,
+    mode: RuntimeMode,
+    args: &Args,
+) -> tokio::process::Command {
     let mut command = tokio::process::Command::new(executable);
     command
         .arg("--mode")
@@ -206,7 +211,9 @@ async fn terminate_child(name: &str, child: &mut tokio::process::Child) {
 
     match child.kill().await {
         Ok(()) => tracing::info!(process = name, "Subprocess terminated"),
-        Err(error) => tracing::warn!(process = name, error = %error, "Failed to terminate subprocess"),
+        Err(error) => {
+            tracing::warn!(process = name, error = %error, "Failed to terminate subprocess")
+        }
     }
 }
 
@@ -405,7 +412,10 @@ async fn main() -> anyhow::Result<()> {
     let cancel_token = CancellationToken::new();
     if runtime_mode.runs_worker() {
         let processing_interval_secs = parse_env_u64("PROCESSING_POLL_INTERVAL_SECS", 10).max(1);
-        tracing::info!(interval_secs = processing_interval_secs, "Starting background processing");
+        tracing::info!(
+            interval_secs = processing_interval_secs,
+            "Starting background processing"
+        );
         let pipeline = state.pipeline.clone();
         let token = cancel_token.child_token();
         tokio::spawn(async move {
@@ -651,8 +661,14 @@ mod tests {
         .expect("read replica should be configured");
 
         assert_eq!(settings.database.url, "libsql://read.turso.io");
-        assert_eq!(settings.database.auth_token, Some("primary-token".to_string()));
-        assert_eq!(settings.database.local_path, Some("primary-local.db".to_string()));
+        assert_eq!(
+            settings.database.auth_token,
+            Some("primary-token".to_string())
+        );
+        assert_eq!(
+            settings.database.local_path,
+            Some("primary-local.db".to_string())
+        );
         assert_eq!(settings.sync_interval_secs, 5);
     }
 

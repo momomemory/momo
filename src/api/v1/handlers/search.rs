@@ -252,7 +252,9 @@ async fn search_hybrid(
 
 fn is_database_locked_error(error: &crate::error::MomoError) -> bool {
     match error {
-        crate::error::MomoError::Database(db_err) => db_err.to_string().contains("database is locked"),
+        crate::error::MomoError::Database(db_err) => {
+            db_err.to_string().contains("database is locked")
+        }
         _ => false,
     }
 }

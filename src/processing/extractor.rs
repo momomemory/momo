@@ -121,7 +121,7 @@ pub fn detect_video_format(bytes: &[u8]) -> Option<VideoFormat> {
         }
     }
 
-    // AVI: RIFF....AVI 
+    // AVI: RIFF....AVI
     if bytes.len() >= 12
         && bytes[0..4] == [0x52, 0x49, 0x46, 0x46]
         && bytes[8..12] == [0x41, 0x56, 0x49, 0x20]
