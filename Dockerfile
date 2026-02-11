@@ -3,8 +3,12 @@ FROM ubuntu:22.04
 ENV DEBIAN_FRONTEND=noninteractive
 ENV ONNXRUNTIME_VERSION=1.23.2
 
-RUN apt-get update && \
-    apt-get install -y --no-install-recommends ca-certificates curl libtesseract4 tesseract-ocr tesseract-ocr-eng && \
+RUN set -eux; \
+    apt_get_install() { \
+      apt-get update; \
+      apt-get install -y --no-install-recommends ca-certificates curl libtesseract4 tesseract-ocr tesseract-ocr-eng; \
+    }; \
+    apt_get_install || apt_get_install; \
     rm -rf /var/lib/apt/lists/*
 
 ARG TARGETARCH
