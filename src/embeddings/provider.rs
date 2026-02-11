@@ -225,8 +225,26 @@ fn resolve_embedding_model(model_name: &str) -> EmbeddingModel {
 }
 
 fn build_model(embedding_model: EmbeddingModel) -> Result<TextEmbedding> {
-    TextEmbedding::try_new(InitOptions::new(embedding_model).with_show_download_progress(true))
-        .map_err(|e| MomoError::Embedding(e.to_string()))
+    let mut last_error: Option<String> = None;
+
+    for attempt in 1..=3 {
+        match TextEmbedding::try_new(
+            InitOptions::new(embedding_model.clone()).with_show_download_progress(true),
+        ) {
+            Ok(model) => return Ok(model),
+            Err(err) => {
+                last_error = Some(err.to_string());
+                if attempt < 3 {
+                    std::thread::sleep(std::time::Duration::from_secs(2));
+                }
+            }
+        }
+    }
+
+    Err(MomoError::Embedding(format!(
+        "Failed to initialize embedding model after retries: {}",
+        last_error.unwrap_or_else(|| "unknown error".to_string())
+    )))
 }
 
 fn parse_bool(raw: &str) -> Option<bool> {
